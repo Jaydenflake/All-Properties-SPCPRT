@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000000; /* Set background to black */
+            touch-action: none; /* Disable default touch behaviors */
+            user-select: none; /* Disable text selection */
+            -webkit-user-select: none; /* Safari specific styling */
+        }
+        #vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(to top, black 0%, transparent 12%);
+            mix-blend-mode: multiply;
+        }
+    </style>
+</head>
+<body>
+    <div id="vignette"></div>
+    <div id="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">Lot #1</div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/",
+            "@lumaai/luma-web": "https://unpkg.com/@lumaai/luma-web@0.2.0/dist/library/luma-web.module.js"
+        }
+    }
+    </script>
+    <script type="module">
+        import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector3, SphereGeometry, CylinderGeometry, MeshBasicMaterial, Mesh, Texture, PlaneGeometry, DoubleSide, MeshStandardMaterial } from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+
+        import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+        import { LumaSplatsThree } from '@lumaai/luma-web';
+
+function isChrome() {
+    return /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+}
+
+        
+        // Parameters
+        const parameters = {
+            camera: {
+                minY: -0.4,
+                maxZoomOut: 1000,
+                startPosition: { x: 0, y: 0.2, z: 2.5 },
+            },
+            scene: {
+                origin: { x: 0, y: -0.9, z: 0 },
+                maxDistanceFromCenter: 45,
+                targetLimit: {
+                    x: 5,
+                    z: 5
+                }
+            },
+            animation: {
+                autoRotate: true,
+                startRadius: 2.95,
+                speed: 0.003
+            },
+            rebound: {
+                speed: 0.2,
+                elasticity: 0.05
+            }
+        };
+
+
+
+
+
+const hotspotConfigurations = [
+    { text: 'Tract 1', position: { x: -2, y: -0.7, z: 3 }, scale: 1 },
+    { text: 'Tract 1', position: { x: -0.9, y: -1.8, z: -1.6 }, scale: 1 },
+    { text: 'Tract 2', position: { x: -2, y: -0.4, z: 6 }, scale: 1 },
+    { text: 'Tract 2', position: { x: -1.6, y: -2.3, z: -4.6 }, scale: 1 },
+    
+    // Add more Hotspots here
+];
+
+
+
+
+
+
+
+	// Centralized control section for BorderDots and BorderLines
+const borderDotPositions = [
+    { name: 'BorderDot_1', position: { x: -2.7, y: -0.4, z: 7.2 } },
+    { name: 'BorderDot_2', position: { x: -2.8, y: -0.9, z: 0 } },
+    { name: 'BorderDot_3', position: { x: -2.8, y: -2.45, z: -5.38 } },
+    { name: 'BorderDot_4', position: { x: -2.1, y: -2.45, z: -5.45 } },
+    { name: 'BorderDot_5', position: { x: -1.1, y: -2.45, z: -5 } },
+    { name: 'BorderDot_6', position: { x: -0.25, y: -2.45, z: -4 } },
+    
+    { name: 'BorderDot_7', position: { x: -2.5, y: -2.1, z: -4 } },
+    { name: 'BorderDot_8', position: { x: -2.5, y: -0.9, z: 0 } },
+    { name: 'BorderDot_9', position: { x: -2.4, y: -0.5, z: 5 } },
+    { name: 'BorderDot_10', position: { x: -0.7, y: -0.6, z: 5 } },
+    { name: 'BorderDot_11', position: { x: -0.5, y: -0.6, z: 7.2 } },
+    
+    { name: 'BorderDot_12', position: { x: -0.9, y: -0.8, z: 3 } },
+    { name: 'BorderDot_13', position: { x: -1.1, y: -1, z: 2 } },
+    { name: 'BorderDot_14', position: { x: -1.3, y: -1, z: 1.3 } },
+    { name: 'BorderDot_15', position: { x: -1.5, y: -1, z: 1 } },
+    { name: 'BorderDot_16', position: { x: -1.8, y: -1, z: 0.7 } },
+    { name: 'BorderDot_17', position: { x: -2, y: -1, z: 0.6 } },
+    { name: 'BorderDot_18', position: { x: -2.3, y: -1, z: 0.56 } },
+    
+    { name: 'BorderDot_19', position: { x: -0.9, y: -1.1, z: 0.56 } },
+    { name: 'BorderDot_20', position: { x: 2.85, y: -2.3, z: 0.56 } },
+    { name: 'BorderDot_21', position: { x: 1.1, y: -2.3, z: -2 } },
+    
+    
+    // Add more BorderDots here by simply adding more objects
+];
+
+const borderLineConnections = [
+    { start: 'BorderDot_1', end: 'BorderDot_2' },
+    { start: 'BorderDot_2', end: 'BorderDot_3' },
+	{ start: 'BorderDot_3', end: 'BorderDot_4' },
+	{ start: 'BorderDot_4', end: 'BorderDot_5' },
+	{ start: 'BorderDot_5', end: 'BorderDot_6' },
+	{ start: 'BorderDot_6', end: 'BorderDot_7' },
+	
+	{ start: 'BorderDot_7', end: 'BorderDot_8' },
+	{ start: 'BorderDot_8', end: 'BorderDot_9' },
+	{ start: 'BorderDot_9', end: 'BorderDot_10' },
+	{ start: 'BorderDot_10', end: 'BorderDot_11' },
+	{ start: 'BorderDot_11', end: 'BorderDot_1' },
+
+	{ start: 'BorderDot_10', end: 'BorderDot_12' },
+	{ start: 'BorderDot_12', end: 'BorderDot_13' },
+	{ start: 'BorderDot_13', end: 'BorderDot_14' },
+	{ start: 'BorderDot_14', end: 'BorderDot_15' },
+	{ start: 'BorderDot_15', end: 'BorderDot_16' },
+	{ start: 'BorderDot_16', end: 'BorderDot_17' },
+	{ start: 'BorderDot_17', end: 'BorderDot_18' },
+	{ start: 'BorderDot_18', end: 'BorderDot_19' },
+	{ start: 'BorderDot_19', end: 'BorderDot_20' },
+	
+	{ start: 'BorderDot_20', end: 'BorderDot_21' },
+	{ start: 'BorderDot_21', end: 'BorderDot_6' },
+	
+	
+	
+    // Add more BorderLine connections here
+];
+
+
+
+
+
+
+
+
+
+
+// Border Dot Parameters
+const borderDotParams = {
+    radius: 0.016, // Smaller radius than the white dots
+    widthSegments: 16, // Less detail since these are smaller
+    heightSegments: 16,
+    color: 0xffa500 // Orange color for differentiation (can be changed later)
+};
+
+
+
+
+
+if (isChrome()) {
+    parameters.animation.speed *= 0.5;
+}
+
+        
+        let renderer = new WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(new Color(0x000000)); // Renderer clear color set to black
+        renderer.setPixelRatio(window.devicePixelRatio * 0.8);
+        document.body.appendChild(renderer.domElement);
+
+        let scene = new Scene();
+
+        let camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, parameters.camera.maxZoomOut);
+        camera.position.set(parameters.camera.startPosition.x, parameters.camera.startPosition.y, parameters.camera.startPosition.z);
+
+        let controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+
+        let sceneCenter = new Vector3(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
+
+        controls.addEventListener('change', () => {
+            // Restrict camera Y minimum
+            if (camera.position.y < parameters.camera.minY) {
+                camera.position.y += (parameters.camera.minY - camera.position.y) * parameters.rebound.speed;
+            }
+
+            // Restrict target movement on X and Z axes with elastic rebound
+            const clampRebound = (current, min, max) => {
+                let clamped = Math.min(Math.max(current, min), max);
+                return clamped + (current - clamped) * parameters.rebound.elasticity;
+            };
+            controls.target.x = clampRebound(controls.target.x, -parameters.scene.targetLimit.x, parameters.scene.targetLimit.x);
+            controls.target.y = parameters.scene.origin.y; // Set target Y limit
+            controls.target.z = clampRebound(controls.target.z, -parameters.scene.targetLimit.z, parameters.scene.targetLimit.z);
+
+            // Restrict camera distance from the scene center
+            if (camera.position.distanceTo(sceneCenter) > parameters.scene.maxDistanceFromCenter) {
+                let direction = new Vector3().subVectors(camera.position, sceneCenter).normalize();
+                camera.position.copy(direction.multiplyScalar(parameters.scene.maxDistanceFromCenter).add(sceneCenter));
+            }
+        });
+
+        let splat = new LumaSplatsThree({
+    source: 'https://lumalabs.ai/embed/ac10d788-558b-4bae-b288-ab8666a4ea0e?mode=sparkles&background=%23ffffff&color=%23000000&showTitle=true&loadBg=true&logoPosition=bottom-left&infoPosition=bottom-right&cinematicVideo=undefined&showMenu=false',
+    particleRevealEnabled: true,
+    particleRevealDuration: 3.33 // Speed up by 50%
+});
+
+// Apply depth testing and lower render order for the splat
+splat.material.depthTest = true;
+splat.renderOrder = 999;  // Ensure the splat is rendered before the border
+scene.add(splat);
+
+
+
+const totalHotspots = hotspotConfigurations.length;
+const hotspots = hotspotConfigurations.map((config, index) => createHotspot(config, index, totalHotspots));
+
+
+
+
+
+
+
+// Function to create a BorderDot based on position data
+function createBorderDot(dotData) {
+    const { name, position } = dotData;
+    let borderDotGeometry = new SphereGeometry(borderDotParams.radius, borderDotParams.widthSegments, borderDotParams.heightSegments);
+    let borderDotMaterial = new MeshBasicMaterial({ color: 0xffa500 });
+    let borderDot = new Mesh(borderDotGeometry, borderDotMaterial);
+
+    // Set the position
+    borderDot.position.set(position.x, position.y, position.z);
+    
+    // Add the border dot to the scene
+    scene.add(borderDot);
+    
+    return { name, mesh: borderDot };
+}
+
+
+// Define the radial segments and material for the cylinders (BorderLines)
+const cylinderRadialSegments = 32; // Radial segments for smoother cylinders
+const cylinderMaterial = new MeshBasicMaterial({ color: 0xffa500 }); // White color for BorderLines
+
+
+
+// Function to create a BorderLine between two BorderDots
+function createBorderLineBetweenDots(dot1, dot2) {
+    const direction = new Vector3().subVectors(dot2.position, dot1.position);
+    const length = direction.length();
+    const cylinderGeometry = new CylinderGeometry(borderDotParams.radius, borderDotParams.radius, length, cylinderRadialSegments);
+    const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
+
+    const midpoint = new Vector3().addVectors(dot1.position, dot2.position).multiplyScalar(0.5);
+    cylinder.position.copy(midpoint);
+
+    const axis = new Vector3(0, 1, 0);  // Default cylinder direction (Y-axis)
+    cylinder.quaternion.setFromUnitVectors(axis.normalize(), direction.clone().normalize());
+
+    // Add the cylinder (BorderLine) to the scene
+    scene.add(cylinder);
+
+    return cylinder;
+}
+
+
+
+
+
+// Create BorderDots from the centralized control section
+const borderDots = {};
+borderDotPositions.forEach(dotData => {
+    const createdDot = createBorderDot(dotData);
+    borderDots[createdDot.name] = createdDot.mesh;
+});
+
+// Create BorderLines based on connections
+borderLineConnections.forEach(connection => {
+    const dot1 = borderDots[connection.start];
+    const dot2 = borderDots[connection.end];
+    if (dot1 && dot2) {
+        createBorderLineBetweenDots(dot1, dot2);
+    }
+});
+
+
+
+
+
+function createHotspot(hotspotConfig, index, totalHotspots) {
+    const { text, position, scale } = hotspotConfig;
+
+    // Create the dot
+    let dotGeometry = new SphereGeometry(0.03, 32, 32);
+    let dotMaterial = new MeshBasicMaterial({ color: 0xffffff });
+    let dot = new Mesh(dotGeometry, dotMaterial);
+    dot.position.set(position.x, position.y, position.z);
+    dot.scale.setScalar(scale);
+    scene.add(dot);
+
+    // Create canvas for text
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 3072;  // Adjust the width for larger text if needed
+    canvas.height = 512;
+    context.fillStyle = 'rgba(255, 255, 255, 0)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Set the font to "Helvetica Neue Bold" with fallback options
+    context.font = '520 250px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    context.lineWidth = 5;
+    context.fillStyle = 'white';  // Set the fill color for the text
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+    context.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+    // Create texture from canvas
+    const texture = new Texture(canvas);
+    texture.needsUpdate = true;
+
+    // Create plane geometry and mesh for the text
+    const geometry = new PlaneGeometry(2.4, 0.4);  // Match the canvas width
+    const material = new MeshStandardMaterial({
+        map: texture,
+        transparent: false,
+        alphaTest: 0.5,
+        side: DoubleSide,
+        premultipliedAlpha: true,
+        emissive: 'white',
+        emissiveIntensity: 2,
+    });
+    const textPlane = new Mesh(geometry, material);
+
+    // Position and rotate text plane
+    textPlane.position.set(position.x, position.y, position.z);
+    textPlane.rotation.y = Math.PI / 2;
+    textPlane.scale.setScalar(scale);
+
+    // IMPORTANT HEIGHT CONTROL: Adjust the y-translation dynamically
+    const yTranslation = 0.3 - (index / totalHotspots) * 0.05;
+    textPlane.geometry.translate(0, yTranslation, 0); 
+
+    scene.add(textPlane);
+
+    return { dot, textPlane };
+}
+
+
+
+
+
+
+
+
+
+
+
+        window.addEventListener('resize', function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }, false);
+
+        let angle = 0;
+        let autoRotate = parameters.animation.autoRotate;
+
+        function animate() {
+    if (autoRotate) {
+        angle += parameters.animation.speed;
+        camera.position.x = Math.sin(angle) * parameters.animation.startRadius;
+        camera.position.z = Math.cos(angle) * parameters.animation.startRadius;
+        camera.lookAt(scene.position); // Ensure the camera always looks at the scene
+    }
+
+    // Make sure each text plane faces the camera
+    hotspots.forEach(hotspot => {
+        hotspot.textPlane.lookAt(camera.position);
+    });
+
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+        
+
+controls.addEventListener('start', () => autoRotate = false);
+        window.addEventListener('touchstart', () => autoRotate = false);
+
+        animate();
+    </script>
+    <script>
+
+let targetFPS = 60; // Target FPS for optimal performance
+let currentFPS = 60; // Initially assume 60 FPS for optimal performance
+let maxPixelRatio = 2; // Maximum pixel ratio for high-performance devices
+let smoothedPixelRatio = window.devicePixelRatio; // Initially set to device pixel ratio
+let smoothingFactor = 0.1; // Smoothing factor for adjusting pixel ratio
+
+// Function to measure FPS
+function measureFPS() {
+    // Measure FPS here and update currentFPS variable
+    // This could be done by calculating the time between frames
+    // For simplicity, let's assume currentFPS is updated externally
+}
+
+// Function to adjust pixel ratio based on measured FPS
+function adjustPixelRatio() {
+    let adjustmentFactor = Math.max(0.3, Math.min(1, currentFPS / targetFPS)); // Clamp adjustment factor between 0.3 and 1
+    let newPixelRatio = Math.floor(window.devicePixelRatio * adjustmentFactor);
+    
+    // Smooth the adjustment using exponential smoothing
+    smoothedPixelRatio += (newPixelRatio - smoothedPixelRatio) * smoothingFactor;
+    
+    // Clamp the smoothed pixel ratio to avoid extreme values
+    smoothedPixelRatio = Math.max(1, Math.min(maxPixelRatio, smoothedPixelRatio));
+    
+    renderer.setPixelRatio(smoothedPixelRatio);
+}
+
+// Function to animate the scene
+function animate() {
+    measureFPS(); // Measure FPS before rendering each frame
+    adjustPixelRatio(); // Adjust pixel ratio based on measured FPS
+    // Render your scene here
+    requestAnimationFrame(animate);
+}
+
+    </script>
+
+</body>
+</html>

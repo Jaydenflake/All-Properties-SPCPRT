@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dolan Road</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000000; /* Set background to black */
+            touch-action: none; /* Disable default touch behaviors */
+            user-select: none; /* Disable text selection */
+            -webkit-user-select: none; /* Safari specific styling */
+        }
+        #vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(to top, black 0%, transparent 12%);
+            mix-blend-mode: multiply;
+        }
+        /* Developer mode controls */
+        #developerControls {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+        }
+        #developerControls button {
+            margin-right: 10px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="vignette"></div>
+    <div id="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">Lot #1</div>
+
+    <!-- Developer mode controls -->
+    <div id="developerControls">
+        <button id="toggleSplat1">Toggle Splat 1</button>
+        <button id="toggleSplat2">Toggle Splat 2</button>
+    </div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/",
+            "@lumaai/luma-web": "https://unpkg.com/@lumaai/luma-web@0.2.0/dist/library/luma-web.module.js"
+        }
+    }
+    </script>
+    <script type="module">
+    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4 } from 'three';
+
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { LumaSplatsThree } from '@lumaai/luma-web';
+
+    function isChrome() {
+        return /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+    }
+
+    // Parameters
+    const parameters = {
+        camera: {
+            minY: 0.83,
+            maxZoomOut: 1000,
+            startPosition: { x: 0, y: 1.3, z: 5.3 },
+        },
+        scene: {
+            origin: { x: 0, y: 0.43, z: 0 },
+            targetLimit: { x: 2, z: 2 }
+        },
+        animation: {
+            autoRotate: true,
+            startRadius: 3,
+            speed: -0.0015,
+            initialAngle: 200  // Start at 200 degrees
+        },
+        rebound: {
+            speed: 0.2,
+            elasticity: 0.05
+        },
+        maxDistance: {
+            base: 3.7,
+            responsiveness: 1.7
+        },
+        // (1) Added new minDistance parameter
+        minDistance: {
+            center: { x: 0, y: 0, z: 0 },
+            radius: 0.1
+        },
+        developerMode: false  // Set this to true to activate developer mode
+    };
+
+    // Hotspot configurations (regular)
+    const hotspotConfigurations = [
+        { text: '315 DOLAN RD', position: { x: -0.75, y: 0.44, z: 0 }, scale: 0.3 },
+        { text: '312 DOLAN RD', position: { x: 0.22, y: 0.43, z: 0.39 }, scale: 0.3 },
+        { text: '324 DOLAN RD', position: { x: 0.22, y: 0.48, z: -0.21 }, scale: 0.3 },
+        { text: '336 DOLAN RD', position: { x: 0.22, y: 0.52, z: -0.85 }, scale: 0.3 },
+        { text: '145 RINK RD', position: { x: -0.12, y: 0.46, z: -1.7 }, scale: 0.3 },
+        // (Removed the 'SOLD' line from here so it doesn't get the sphere)
+    ];
+
+    // "Sold" hotspot configuration (new separate 'Sold' class)
+    // Added a 'verticalOffset' to allow controlling its height offset
+    const soldHotspotConfigurations = [
+        { 
+            text: 'SOLD', 
+            position: { x: 0.22, y: 0.5, z: -0.85 }, 
+            scale: 0.2,
+            verticalOffset: 0.06 // You can adjust this to move the text up/down while rotating around the same center
+        },
+    ];
+
+    // Centralized control section for TapDots
+    const tapDotConfigurations = [
+        // Example TapDots (none currently)
+        //{ position: { x: 0, y: 0, z: 1 }, scale: 1, icon: 'info' },
+    ];
+
+    // Base tap detection radius in pixels
+    const baseTapDetectionRadius = 15; // Base value for tap detection radius
+
+    // Centralized control section for BorderDots and BorderLines
+    const borderDotPositions = [
+        { name: 'BorderDot_1', position: { x: -0.38, y: 0.43, z: 0 } },
+        { name: 'BorderDot_2', position: { x: -0.38, y: 0.36, z: 0.69 } },
+        { name: 'BorderDot_3', position: { x: -1.13, y: 0.44, z: 0.69 } },
+        { name: 'BorderDot_4', position: { x: -1.11, y: 0.35, z: 0.25 } },
+        { name: 'BorderDot_5', position: { x: -1.1, y: 0.46, z: -0.4 } },
+        { name: 'BorderDot_6', position: { x: -1.1, y: 0.53, z: -1.2 } },
+        { name: 'BorderDot_7', position: { x: -1.1, y: 0.39, z: -2.5 } },
+        { name: 'BorderDot_8', position: { x: 0.83, y: 0.35, z: -2.5 } },
+        { name: 'BorderDot_9', position: { x: 0.83, y: 0.45, z: -1.2 } },
+        { name: 'BorderDot_10', position: { x: 0.83, y: 0.527, z: -0.56 } },
+        { name: 'BorderDot_11', position: { x: 0.83, y: 0.52, z: -0.2 } },
+        { name: 'BorderDot_12', position: { x: 0.83, y: 0.482, z: 0.05 } },
+        { name: 'BorderDot_13', position: { x: 0.83, y: 0.41, z: 0.67 } },
+
+        { name: 'BorderDot_14', position: { x: -0.38, y: 0.46, z: -0.3 } },
+        { name: 'BorderDot_15', position: { x: -0.7, y: 0.47, z: -0.3 } },
+        { name: 'BorderDot_16', position: { x: -1.1, y: 0.44, z: -0.3 } },
+       
+        { name: 'BorderDot_17', position: { x: -0.32, y: 0.51, z: -1.18 } },
+        { name: 'BorderDot_18', position: { x: 0.4, y: 0.48, z: -1.18 } },
+        { name: 'BorderDot_19', position: { x: 0.83, y: 0.45, z: -1.18 } },
+
+        { name: 'BorderDot_20', position: { x: 0.34, y: 0.51, z: -0.56 } },
+        { name: 'BorderDot_21', position: { x: -0.36, y: 0.472, z: -0.56 } },
+
+        { name: 'BorderDot_22', position: { x: -0.38, y: 0.423, z: 0.05 } },
+
+    ];
+
+    const borderLineConnections = [
+        { start: 'BorderDot_1', end: 'BorderDot_2' },
+        { start: 'BorderDot_2', end: 'BorderDot_3' },
+        { start: 'BorderDot_3', end: 'BorderDot_4' },
+        { start: 'BorderDot_4', end: 'BorderDot_5' },
+        { start: 'BorderDot_5', end: 'BorderDot_6' },
+        { start: 'BorderDot_6', end: 'BorderDot_7' },
+        { start: 'BorderDot_7', end: 'BorderDot_8' },
+        { start: 'BorderDot_8', end: 'BorderDot_9' },
+        { start: 'BorderDot_9', end: 'BorderDot_10' },
+        { start: 'BorderDot_10', end: 'BorderDot_11' },
+        { start: 'BorderDot_11', end: 'BorderDot_12' },
+        { start: 'BorderDot_12', end: 'BorderDot_13' },
+        { start: 'BorderDot_13', end: 'BorderDot_2' },
+     
+        { start: 'BorderDot_1', end: 'BorderDot_14' },
+        { start: 'BorderDot_14', end: 'BorderDot_15' },
+        { start: 'BorderDot_15', end: 'BorderDot_16' },
+        
+        { start: 'BorderDot_14', end: 'BorderDot_17' },
+        { start: 'BorderDot_17', end: 'BorderDot_18' },
+        { start: 'BorderDot_18', end: 'BorderDot_19' },
+        
+        { start: 'BorderDot_10', end: 'BorderDot_20' },
+        { start: 'BorderDot_20', end: 'BorderDot_21' },
+        
+        { start: 'BorderDot_12', end: 'BorderDot_22' },
+        
+    ];
+
+    // Border Dot Parameters
+    const borderDotParams = {
+        radius: 0.01,
+        widthSegments: 16,
+        heightSegments: 16,
+        color: 0xffa500
+    };
+
+    // Base sizes for TapDots and Icons
+    const tapDotBaseSize = 0.04; // Adjust this value to change the TapDot size
+    const iconBaseSize = 0.08;   // Adjust this value to change the Icon size
+
+    // Zone configurations
+    const zoneConfigurations = [
+        {
+            name: 'Zone1',
+            center: { x: 0, y: 0, z: 0 }, // Center point of the zone
+            radius: 100.6, // Radius of the zone
+            splatsOn: ['splat2'], // Splats to turn ON when inside this zone
+            splatsOff: ['splat1'] // Splats to turn OFF when inside this zone
+        }
+    ];
+
+    if (isChrome()) {
+        parameters.animation.speed *= 0.5;
+    }
+
+    let renderer = new WebGLRenderer({ antialias: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(new Color(0x000000));
+    renderer.setPixelRatio(window.devicePixelRatio * 0.8);
+    document.body.appendChild(renderer.domElement);
+
+    let scene = new Scene();
+
+    let camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, parameters.camera.maxZoomOut);
+    camera.position.set(parameters.camera.startPosition.x, parameters.camera.startPosition.y, parameters.camera.startPosition.z);
+
+    let controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+
+    // (2) Halved the zoom sensitivity
+    controls.zoomSpeed = 0.5;
+
+    let sceneCenter = new Vector3(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
+
+    controls.addEventListener('change', () => {
+        // Restrict camera Y minimum
+        if (camera.position.y < parameters.camera.minY) {
+            camera.position.y += (parameters.camera.minY - camera.position.y) * parameters.rebound.speed;
+        }
+
+        // Restrict target movement on X and Z axes with elastic rebound
+        const clampRebound = (current, min, max) => {
+            let clamped = Math.min(Math.max(current, min), max);
+            return clamped + (current - clamped) * parameters.rebound.elasticity;
+        };
+        controls.target.x = clampRebound(controls.target.x, -parameters.scene.targetLimit.x, parameters.scene.targetLimit.x);
+        controls.target.y = parameters.scene.origin.y; // Set target Y limit
+        controls.target.z = clampRebound(controls.target.z, -parameters.scene.targetLimit.z, parameters.scene.targetLimit.z);
+
+        // Restrict camera distance from the scene center
+        const maxDistance = calculateMaxDistance();  // Get the updated max distance
+        if (camera.position.distanceTo(sceneCenter) > maxDistance) {
+            let direction = new Vector3().subVectors(camera.position, sceneCenter).normalize();
+            camera.position.copy(direction.multiplyScalar(maxDistance).add(sceneCenter));
+        }
+
+        // (3) Clamp camera to new minDistance
+        const minDistCenter = new Vector3(
+            parameters.minDistance.center.x, 
+            parameters.minDistance.center.y, 
+            parameters.minDistance.center.z
+        );
+        if (camera.position.distanceTo(minDistCenter) < parameters.minDistance.radius) {
+            let direction = new Vector3().subVectors(camera.position, minDistCenter).normalize();
+            camera.position.copy(direction.multiplyScalar(parameters.minDistance.radius).add(minDistCenter));
+        }
+
+        // Zone-based splat toggling
+        if (!developerMode) {
+            let cameraInZone = false;
+
+            for (let zone of zoneConfigurations) {
+                let zoneCenter = new Vector3(zone.center.x, zone.center.y, zone.center.z);
+                let distanceToZone = camera.position.distanceTo(zoneCenter);
+
+                if (distanceToZone <= zone.radius) {
+                    cameraInZone = true;
+                    // Turn the "new" splats on immediately
+                    for (let splatName of zone.splatsOn) {
+                        if (splats[splatName] && !splats[splatName].visible) {
+                            splats[splatName].visible = true;
+                        }
+                    }
+                    // Turn the "old" splats off after 30ms delay
+                    for (let splatName of zone.splatsOff) {
+                        if (splats[splatName] && splats[splatName].visible) {
+                            setTimeout(() => {
+                                splats[splatName].visible = false;
+                            }, 15);
+                        }
+                    }
+                    break; // Assuming only one zone is active at a time
+                }
+            }
+
+            if (!cameraInZone) {
+                // Set default splat visibility when not in any zone
+                // "new" is splat1 here, so it goes on right away
+                splats.splat1.visible = true;
+                // "old" is splat2 here, so it goes off after 30ms
+                if (splats.splat2.visible) {
+                    setTimeout(() => {
+                        splats.splat2.visible = false;
+                    }, 15);
+                }
+            }
+        }
+    });
+
+    // Developer mode toggle
+    const developerMode = parameters.developerMode;
+
+    // Splat configurations
+    const splatConfigs = {
+        splat1: {
+            source: '',
+            position: new Vector3(0.063, 0, -0.165),
+            rotation: { x: 0, y: 0, z: 0 },
+            scale: 1
+        },
+        splat2: {
+            source: 'https://lumalabs.ai/embed/60f284cb-8f24-43e2-b729-883dd92dc9f1?mode=sparkles&background=%23ffffff&color=%23000000&showTitle=true&loadBg=true&logoPosition=bottom-left&infoPosition=bottom-right&cinematicVideo=undefined&showMenu=false',
+            position: new Vector3(0, 0, 0),
+            rotation: { x: 0, y: 0, z: 0 },
+            scale: 1
+        }
+    };
+
+    // Create the first splat
+    let splat = new LumaSplatsThree({
+        source: splatConfigs.splat1.source,
+        particleRevealEnabled: true,
+        particleRevealDuration: 3.33 // Speed up by 50%
+    });
+    splat.material.depthTest = true;
+    splat.renderOrder = 999;
+    splat.position.copy(splatConfigs.splat1.position);
+    splat.rotation.x = MathUtils.degToRad(splatConfigs.splat1.rotation.x);
+    splat.rotation.y = MathUtils.degToRad(splatConfigs.splat1.rotation.y);
+    splat.rotation.z = MathUtils.degToRad(splatConfigs.splat1.rotation.z);
+    splat.scale.setScalar(splatConfigs.splat1.scale);
+    scene.add(splat);
+
+    // Create the second splat
+    let splat2 = new LumaSplatsThree({
+        source: splatConfigs.splat2.source,
+        particleRevealEnabled: true,
+        particleRevealDuration: 3.33
+    });
+    splat2.material.depthTest = true;
+    splat2.renderOrder = 999;
+    splat2.position.copy(splatConfigs.splat2.position);
+    splat2.rotation.x = MathUtils.degToRad(splatConfigs.splat2.rotation.x);
+    splat2.rotation.y = MathUtils.degToRad(splatConfigs.splat2.rotation.y);
+    splat2.rotation.z = MathUtils.degToRad(splatConfigs.splat2.rotation.z);
+    splat2.scale.setScalar(splatConfigs.splat2.scale);
+    scene.add(splat2);
+
+    const splats = {
+        splat1: splat,
+        splat2: splat2
+    };
+
+    if (developerMode) {
+        splat.visible = true;
+        splat2.visible = true;
+        document.getElementById('developerControls').style.display = 'block';
+        document.getElementById('toggleSplat1').addEventListener('click', () => {
+            splat.visible = !splat.visible;
+        });
+        document.getElementById('toggleSplat2').addEventListener('click', () => {
+            splat2.visible = !splat2.visible;
+        });
+    } else {
+        splat.visible = true;
+        splat2.visible = false;
+    }
+
+    // TapDots Logic
+    let tapDots = [];
+    const textureLoader = new TextureLoader();
+    const iconTextures = {};
+    const iconsToLoad = [
+        { name: 'info', url: 'https://raw.githubusercontent.com/HansenHomeAI/WhiteInfoIcon/main/3TestIcons-8.png' },
+        { name: 'camera', url: 'https://raw.githubusercontent.com/HansenHomeAI/WhiteCameraIcon/main/3TestIcons-9.png' },
+    ];
+
+    let iconsLoaded = 0;
+    iconsToLoad.forEach(iconData => {
+        textureLoader.load(iconData.url, (texture) => {
+            iconTextures[iconData.name] = texture;
+            iconsLoaded++;
+            if (iconsLoaded === iconsToLoad.length) {
+                tapDotConfigurations.forEach((config, index) => createTapDot(config, index));
+                animate();
+            }
+        },
+        undefined,
+        (err) => {
+            console.error(`Error loading texture: ${iconData.url}`, err);
+        });
+    });
+
+    function generateUniqueColor(index) {
+        index += 1;
+        const r = (index * 37) % 256;
+        const g = (index * 57) % 256;
+        const b = (index * 79) % 256;
+        const minComponent = 50;
+        const maxComponent = 255;
+        const range = maxComponent - minComponent;
+        const adjustComponent = (value) => Math.floor((value / 255) * range + minComponent);
+        const finalR = adjustComponent(r);
+        const finalG = adjustComponent(g);
+        const finalB = adjustComponent(b);
+        return `#${finalR.toString(16).padStart(2,'0')}${finalG.toString(16).padStart(2,'0')}${finalB.toString(16).padStart(2,'0')}`;
+    }
+
+    function createTapDot(config, index) {
+        const { position, scale, icon } = config;
+        const dotColor = generateUniqueColor(index);
+        let dotGeometry = new SphereGeometry(tapDotBaseSize, 32, 32);
+        let dotMaterial = new MeshBasicMaterial({
+            color: 0x2C2C2E,
+            transparent: true,
+            opacity: 0.7
+        });
+        let dot = new Mesh(dotGeometry, dotMaterial);
+        dot.position.set(position.x, position.y, position.z);
+        dot.scale.setScalar(scale || 1);
+
+        const iconGeometry = new PlaneGeometry(iconBaseSize, iconBaseSize);
+        const iconMaterial = new MeshBasicMaterial({
+            map: iconTextures[icon],
+            transparent: true,
+            alphaTest: 0.5
+        });
+        let iconMesh = new Mesh(iconGeometry, iconMaterial);
+        iconMesh.position.copy(dot.position);
+        iconMesh.scale.setScalar(scale || 1);
+
+        tapDots.push({ dot, iconMesh, color: dotColor, scale, index, config });
+        scene.add(dot);
+        scene.add(iconMesh);
+    }
+
+    const hiddenCanvas = document.createElement('canvas');
+    const hiddenContext = hiddenCanvas.getContext('2d');
+    hiddenCanvas.width = window.innerWidth;
+    hiddenCanvas.height = window.innerHeight;
+    hiddenCanvas.style.display = 'none';
+    document.body.appendChild(hiddenCanvas);
+
+    function renderHiddenCanvas() {
+        hiddenContext.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+        tapDots.forEach((tapDot) => {
+            let screenPos = tapDot.dot.position.clone().project(camera);
+            let x = (screenPos.x + 1) / 2 * window.innerWidth;
+            let y = -(screenPos.y - 1) / 2 * window.innerHeight;
+            const distanceToCamera = camera.position.distanceTo(tapDot.dot.position);
+            const dynamicRadius = baseTapDetectionRadius * (tapDot.scale || 1) / distanceToCamera;
+            hiddenContext.fillStyle = tapDot.color;
+            hiddenContext.beginPath();
+            hiddenContext.arc(x, y, dynamicRadius, 0, 2 * Math.PI);
+            hiddenContext.fill();
+        });
+    }
+
+    // Create normal hotspots (unchanged logic)
+    const totalHotspots = hotspotConfigurations.length;
+    const hotspots = hotspotConfigurations.map((config, index) => createHotspot(config, index, totalHotspots));
+
+    // Create "Sold" hotspots (new function, same concept but no sphere + orange text)
+    const soldHotspots = soldHotspotConfigurations.map((config) => createSoldHotspot(config));
+
+    function calculateMaxDistance() {
+        const aspectRatio = window.innerWidth / window.innerHeight;
+        let additionalDistance = (1 / aspectRatio) * parameters.maxDistance.responsiveness;
+        return parameters.maxDistance.base + additionalDistance;
+    }
+
+    function createBorderDot(dotData) {
+        const { name, position } = dotData;
+        let borderDotGeometry = new SphereGeometry(borderDotParams.radius, borderDotParams.widthSegments, borderDotParams.heightSegments);
+        let borderDotMaterial = new MeshBasicMaterial({ color: borderDotParams.color, transparent: true, opacity: 0 });
+        let borderDot = new Mesh(borderDotGeometry, borderDotMaterial);
+        borderDot.scale.y = 0.1;
+        borderDot.position.set(position.x, position.y, position.z);
+        scene.add(borderDot);
+        return { name, mesh: borderDot };
+    }
+
+    // ***** ONLY THIS FUNCTION CHANGED TO REMOVE LENGTH-WISE ROLL *****
+    function createBorderLineBetweenDots(dot1, dot2) {
+        const start = dot1.position;
+        const end = dot2.position;
+        const direction = new Vector3().subVectors(end, start);
+        const length = direction.length();
+        const midPoint = new Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+        const boxThickness = borderDotParams.radius * 2;
+        const boxHeight = 0.002;
+
+        const boxGeometry = new BoxGeometry(length, boxHeight, boxThickness);
+        const boxMaterial = new MeshBasicMaterial({ color: borderDotParams.color, transparent: true, opacity: 0 });
+        const box = new Mesh(boxGeometry, boxMaterial);
+
+        // We define the local X axis as the direction of the line
+        // and then fix the local Y/Z using a stable 'up' vector so we don't roll.
+        let x = direction.clone().normalize();
+        let up = new Vector3(0, 1, 0);
+
+        // If direction is nearly parallel to world up, pick a different stable up
+        if (Math.abs(x.dot(up)) > 0.9999) {
+            up = new Vector3(0, 0, 1);
+        }
+
+        let z = new Vector3().crossVectors(x, up).normalize();
+        let y = new Vector3().crossVectors(z, x).normalize();
+
+        let rotMatrix = new Matrix4();
+        // Create a rotation basis from x,y,z
+        rotMatrix.makeBasis(x, y, z);
+
+        // Position the box at the midpoint
+        let translationMatrix = new Matrix4().makeTranslation(midPoint.x, midPoint.y, midPoint.z);
+
+        box.matrixAutoUpdate = false;
+        box.matrix.multiplyMatrices(translationMatrix, rotMatrix);
+
+        scene.add(box);
+        return box;
+    }
+    // ***** END CHANGE *****
+
+    let fadeDuration = 5;
+    let borderDotDelay = 0.9;
+    let fadeStartTime = null;
+
+    function fadeInBorders(time) {
+        if (!fadeStartTime) fadeStartTime = time;
+        let elapsedTime = (time - fadeStartTime) / 1000;
+        let lineOpacity = Math.min(elapsedTime / fadeDuration, 1);
+        let dotElapsedTime = elapsedTime - borderDotDelay;
+        let dotOpacity = Math.min(Math.max(dotElapsedTime / fadeDuration, 0), 1);
+        borderLines.forEach(box => {
+            box.material.opacity = lineOpacity;
+        });
+        Object.values(borderDots).forEach(dot => {
+            dot.material.opacity = dotOpacity;
+        });
+        if (lineOpacity < 1 || dotOpacity < 1) {
+            requestAnimationFrame(fadeInBorders);
+        }
+    }
+
+    const borderDots = {};
+    const borderLines = [];
+    borderDotPositions.forEach(dotData => {
+        const createdDot = createBorderDot(dotData);
+        borderDots[createdDot.name] = createdDot.mesh;
+    });
+    borderLineConnections.forEach(connection => {
+        const dot1 = borderDots[connection.start];
+        const dot2 = borderDots[connection.end];
+        if (dot1 && dot2) {
+            const borderLine = createBorderLineBetweenDots(dot1, dot2);
+            borderLines.push(borderLine);
+        }
+    });
+    requestAnimationFrame(fadeInBorders);
+
+    // Original hotspot creation function (unchanged)
+    function createHotspot(hotspotConfig, index, totalHotspots) {
+        const { text, position, scale } = hotspotConfig;
+        let dotGeometry = new SphereGeometry(0.03, 32, 32);
+        let dotMaterial = new MeshBasicMaterial({ color: 0xffffff });
+        let dot = new Mesh(dotGeometry, dotMaterial);
+        dot.position.set(position.x, position.y, position.z);
+        dot.scale.setScalar(scale);
+        scene.add(dot);
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 3072;
+        canvas.height = 512;
+        context.fillStyle = 'rgba(255, 255, 255, 0)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.font = '520 250px "Helvetica Neue", Helvetica, Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        context.lineWidth = 5;
+        context.fillStyle = 'white';
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+        context.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new Texture(canvas);
+        texture.needsUpdate = true;
+        const geometry = new PlaneGeometry(2.4, 0.4);
+        const material = new MeshStandardMaterial({
+            map: texture,
+            transparent: false,
+            alphaTest: 0.5,
+            side: DoubleSide,
+            premultipliedAlpha: true,
+            emissive: 'white',
+            emissiveIntensity: 2,
+        });
+        const textPlane = new Mesh(geometry, material);
+        textPlane.position.set(position.x, position.y, position.z);
+        textPlane.rotation.y = MathUtils.degToRad(90);
+        textPlane.scale.setScalar(scale);
+
+        const yTranslation = 0.3 - (index / totalHotspots) * 0.05;
+        textPlane.geometry.translate(0, yTranslation, 0);
+        scene.add(textPlane);
+
+        return { dot, textPlane };
+    }
+
+    // New "Sold" hotspot creation function
+    // Identical to createHotspot except:
+    // - No sphere is created
+    // - The text color is orange (#FF4F40 here)
+    // - We add a controllable verticalOffset (config.verticalOffset)
+    function createSoldHotspot(config) {
+        const { text, position, scale, verticalOffset } = config;
+
+        // Create the text canvas (orange text, no sphere)
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 3072;
+        canvas.height = 512;
+        context.fillStyle = 'rgba(255, 255, 255, 0)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.font = '520 250px "Helvetica Neue", Helvetica, Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        context.lineWidth = 5;
+        // Orange text fill:
+        context.fillStyle = '#BF281B';
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+        context.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new Texture(canvas);
+        texture.needsUpdate = true;
+        const geometry = new PlaneGeometry(2.4, 0.4);
+        const material = new MeshStandardMaterial({
+            map: texture,
+            transparent: false,
+            alphaTest: 0.5,
+            side: DoubleSide,
+            premultipliedAlpha: true,
+            emissive: '#BF281B',
+            emissiveIntensity: 2,
+        });
+
+        const textPlane = new Mesh(geometry, material);
+        // Position at the same center but allow a verticalOffset
+        textPlane.position.set(position.x, position.y + (verticalOffset || 0), position.z);
+        textPlane.rotation.y = MathUtils.degToRad(90);
+        textPlane.scale.setScalar(scale);
+
+        // You can further modify geometry translation if desired, but here we keep it minimal
+        scene.add(textPlane);
+
+        // Return something if we need to track it
+        return { textPlane };
+    }
+
+    window.addEventListener('resize', function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        parameters.scene.maxDistanceFromCenter = calculateMaxDistance();
+    });
+
+    let angle = parameters.animation.initialAngle !== undefined 
+        ? MathUtils.degToRad(parameters.animation.initialAngle) 
+        : 0;
+    let autoRotate = parameters.animation.autoRotate;
+
+    function animate() {
+        if (autoRotate) {
+            angle += parameters.animation.speed;
+            camera.position.x = Math.sin(angle) * parameters.animation.startRadius;
+            camera.position.z = Math.cos(angle) * parameters.animation.startRadius;
+            camera.lookAt(scene.position);
+        }
+
+        // Make normal hotspot text always face the camera
+        hotspots.forEach(hotspot => {
+            hotspot.textPlane.lookAt(camera.position);
+        });
+
+        // Make "Sold" hotspot text always face the camera
+        soldHotspots.forEach(sold => {
+            sold.textPlane.lookAt(camera.position);
+        });
+
+        tapDots.forEach(tapDot => {
+            tapDot.iconMesh.lookAt(camera.position);
+            let direction = new Vector3().subVectors(camera.position, tapDot.dot.position).normalize();
+            let tapDotRadius = tapDotBaseSize * (tapDot.scale || 1);
+            let offsetDistance = tapDotRadius + 0.02;
+            tapDot.iconMesh.position.copy(tapDot.dot.position).add(direction.multiplyScalar(offsetDistance));
+        });
+
+        controls.update();
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+
+    controls.addEventListener('start', () => autoRotate = false);
+    window.addEventListener('touchstart', () => autoRotate = false);
+
+    window.addEventListener('click', (event) => {
+        const x = event.clientX;
+        const y = event.clientY;
+        renderHiddenCanvas();
+        const pixelData = hiddenContext.getImageData(x, y, 1, 1).data;
+        const tappedColor = `#${pixelData[0].toString(16).padStart(2, '0')}${pixelData[1].toString(16).padStart(2, '0')}${pixelData[2].toString(16).padStart(2, '0')}`;
+        console.log(`Tapped color: ${tappedColor}`);
+
+        let closestDot = null;
+        let closestDistance = Infinity;
+        tapDots.forEach(tapDot => {
+            let screenPos = tapDot.dot.position.clone().project(camera);
+            let dotX = (screenPos.x + 1) / 2 * window.innerWidth;
+            let dotY = -(screenPos.y - 1) / 2 * window.innerHeight;
+            let distance = Math.sqrt(Math.pow(dotX - x, 2) + Math.pow(dotY - y, 2));
+            if (distance < closestDistance && distance < baseTapDetectionRadius * (tapDot.scale || 1)) {
+                closestDot = tapDot;
+                closestDistance = distance;
+            }
+        });
+
+        if (closestDot) {
+            console.log(`Tapped TapDot: ${closestDot.index}`);
+            let coloredSquare = document.createElement('div');
+            coloredSquare.style.position = 'absolute';
+            coloredSquare.style.top = '10px';
+            coloredSquare.style.left = '10px';
+            coloredSquare.style.width = '50px';
+            coloredSquare.style.height = '50px';
+            coloredSquare.style.backgroundColor = closestDot.color;
+            coloredSquare.style.color = 'white';
+            coloredSquare.style.display = 'flex';
+            coloredSquare.style.alignItems = 'center';
+            coloredSquare.style.justifyContent = 'center';
+            coloredSquare.style.fontSize = '20px';
+            coloredSquare.style.fontWeight = 'bold';
+            coloredSquare.textContent = `Dot ${closestDot.index}`;
+            document.body.appendChild(coloredSquare);
+
+            setTimeout(() => {
+                document.body.removeChild(coloredSquare);
+            }, 1000);
+        } else {
+            console.log('No TapDot detected');
+        }
+    });
+
+    // Start animation once icons are loaded
+    // (If no icons, we simply call animate() immediately)
+    if (iconsToLoad.length === 0) {
+        animate();
+    }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>38510 SE 49TH ST Washougal, WA</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .main-button {
+    background-color: transparent; /* Make the main button background transparent */
+    color: #007AFF; /* Apple blue */
+    font-weight: bold;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    transition: all 0.2s ease; /* Smooth transition for all properties */
+    left: 10%;
+    bottom: 10%;
+    width: 50px;
+    height: 50px;
+    z-index: 15;
+    box-shadow: none; /* Remove shadow */
+}
+
+.main-button::before, .main-button::after
+{
+    content: "";
+    position: absolute;
+    top: -5;
+    left: -5;
+    width: 110%;
+    height: 110%;
+    background-image: url('https://raw.githubusercontent.com/HansenHomeAI/1Shadow/main/1Shadow.png');
+    background-size: cover;
+    filter: blur(7.5px); /* Adjust the blur as needed */
+    opacity: 1; /* Make the shadow semi-transparent */
+    transform: translate(0px, 5px); /* Adjust the offset as needed */
+    pointer-events: none; /* Ensure the shadow doesn't interfere with clicking */
+    z-index: -1; /* Ensure it is behind the main button */
+    //-webkit-backdrop-filter: blur(0.02px); /* Apply blur effect for Safari */
+}
+
+.main-button img {
+    width: 100%;
+    height: 100%;
+}
+
+.main-button:hover {
+    transform: scale(1.1); /* Significantly reduce the scale effect */
+}
+
+
+        .icon-button {
+    background-color: rgba(255, 255, 255, 0.2); /* Make the background semi-transparent */
+    backdrop-filter: blur(10px); /* Apply blur effect */
+    -webkit-backdrop-filter: blur(5px); /* Apply blur effect for Safari */
+    color: #007AFF; /* Apple blue */
+    font-weight: bold;
+    border-radius: 9999px; /* Full rounded */
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    transition: all 0.3s ease, opacity 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease; /* Include transform and box-shadow */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 35px; /* 30% smaller than 50px */
+    height: 35px; /* 30% smaller than 50px */
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0); /* Start with scale 0 */
+    z-index: 56; /* Ensure the buttons are above the dark blur layer */
+}
+
+
+        .icon-button.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1); /* Scale up to full size when visible */
+        }
+
+        .icon-button:hover {
+            transform: scale(1.2); /* Slightly enlarge on hover */
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2); /* Enhanced shadow on hover */
+        }
+
+
+.icon-svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Ensures the SVG maintains its aspect ratio */
+    object-position: center; /* Centers the SVG within the container */
+    border-radius: 50%; /* Optional: to match the rounded button */
+    display: block; /* Ensures the SVG is displayed as a block-level element */
+}
+
+
+
+
+
+        /* Style for the debug circle */
+        //.debug-circle {
+            position: fixed;
+            width: 50px;
+            height: 50px;
+            background-color: darkgreen;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 30;
+        }
+
+        /* Style for the blue square */
+        //.blue-square {
+            position: fixed;
+            width: 50px;
+            height: 50px;
+            background-color: navy;
+            top: 10px;
+            right: 10px;
+            display: none;
+            z-index: 40;
+        }
+
+        /* Darkened and blurred background layer */
+        .dark-blur-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4); /* Slightly darkened */
+    backdrop-filter: blur(10px); /* Apply blur effect */
+    -webkit-backdrop-filter: blur(3px); /* Apply blur effect for Safari */
+    opacity: 0;
+    pointer-events: none; /* Disable pointer events by default */
+    transition: opacity 0.5s ease, pointer-events 0.5s ease; /* Smooth transition */
+    z-index: 5; /* Layer it behind the buttons but in front of the background */
+}
+
+.dark-blur-layer.visible {
+    opacity: 1;
+    pointer-events: auto; /* Enable pointer events when visible */
+}
+
+
+        /* Style for the hover text */
+        .hover-text {
+    position: fixed;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.5s ease, visibility 0s linear 0.5s; /* Delayed visibility change */
+    z-index: 12;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    top: 20px;
+    left: 20px;
+    line-height: 1.0;
+    pointer-events: none; /* Disable pointer events by default */
+}
+
+.hover-text.visible {
+    opacity: 1;
+    pointer-events: auto; /* Enable pointer events when visible */
+    transition: opacity 0.5s ease; /* No delay for visibility */
+}
+
+
+
+
+.distance-display {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: transparent;
+    color: transparent;
+    padding: 10px;
+    border-radius: 5px;
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    z-index: 15;
+    pointer-events: none; /* Disable pointer events by default */
+
+}
+
+
+
+
+
+
+
+.details-box {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 600px;
+        height: 60%;
+        padding: 20px;
+        background-color: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(35px);
+        -webkit-backdrop-filter: blur(35px);
+        border-radius: 20px;
+        overflow-y: auto;
+        color: #000;
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        z-index: 20;
+        opacity: 0;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    .details-box::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .details-box::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 20px;
+    margin-top: 20px; /* Add top margin */
+    margin-bottom: 20px; /* Add bottom margin */
+    margin-left: 5%;
+    margin-right: 5%;
+}
+
+
+    .details-box::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 10px;
+        height: 90%;
+    }
+
+    .details-box.visible {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    .hidden {
+        display: none;
+    }
+
+
+
+
+
+
+
+.credits-box {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 600px;
+    height: 60%;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(35px);
+    -webkit-backdrop-filter: blur(35px);
+    border-radius: 20px;
+    overflow-y: auto;
+    color: #000;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-sizing: border-box;
+}
+
+.credits-box::-webkit-scrollbar {
+    width: 5px;
+}
+
+.credits-box::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 20px;
+    margin-top: 20px; /* Add top margin */
+    margin-bottom: 20px; /* Add bottom margin */
+    margin-left: 5%;
+    margin-right: 5%;
+}
+
+.credits-box::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    height: 90%;
+}
+
+.credits-box.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.hidden {
+    display: none;
+}
+
+
+
+/* Spinner styles */
+.spinner {
+    border: 3.5px solid rgba(0, 0, 0, 0.1);
+    border-top: 3.5px solid #FFFFFF; /* Change blue to white */
+    border-radius: 50%;
+    width: 100px; /* Width */
+    height: 100px; /* Height */
+    animation: spin 0.9s linear 11; /* Run the animation 11 times */
+    position: fixed;
+    center: 0px;
+    center: 0px;
+    transform: translate(-50%, -50%); /* Ensure it's perfectly centered */
+    z-index: 9999; /* Ensure it is at the very front */
+    opacity: 1; /* Ensure it is visible initially */
+    transition: opacity 1s; /* Add transition for opacity */
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+
+
+
+
+
+.logo-image {
+    display: block;
+    max-width: 80%;
+    height: auto;
+    margin: 0 auto 20px; /* Center the logo and add some margin below it */
+    margin-top: 1.6em;
+    margin-bottom: 3em;
+
+}
+
+
+
+
+
+.credits h1 {
+    font-size: 1.2em; /* Adjust font size as needed */
+    font-weight: bold;
+    margin-top: 1.5em; /* Add space above each header */
+    margin-bottom: 0.5em; /* Add space below each header */
+}
+
+.credits p {
+    margin-bottom: 1.5em; /* Add space below each paragraph */
+}
+
+
+.details h1 {
+    font-size: 1.2em; /* Adjust font size as needed */
+    font-weight: bold;
+    margin-top: 1.5em; /* Add space above each header */
+    margin-bottom: 0.2em; /* Add space below each header */
+}
+
+.details p {
+    margin-bottom: 1.5em; /* Add space below each paragraph */
+}
+
+
+
+body {
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none;    /* Firefox */
+    -ms-user-select: none;     /* Internet Explorer/Edge */
+    user-select: none;         /* Non-prefixed version, currently supported by Chrome, Edge, Opera and Firefox */
+}
+
+
+img {
+    -webkit-user-drag: none;
+    user-drag: none;
+}
+
+
+
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.iframe-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0; /* Ensure the iframe is in the background */
+}
+
+iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* Update existing elements to ensure they overlay correctly */
+.main-button, .icon-button, .hover-text, .details-box, .credits-box {
+    position: absolute; /* Ensure all elements are positioned absolutely */
+    z-index: 1000; /* Ensure they are on top of the iframe */
+}
+
+
+
+
+.menu-text {
+    display: flex;
+    align-items: center;
+    color: #FFFFFF;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    position: absolute;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 14;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    animation: glide 4s ease-in-out infinite;
+}
+
+.menu-text.visible {
+    opacity: 1;
+}
+
+.chevron-svg {
+    width: 41.2px;
+    height: 41.2px;
+    margin-right: -3px;
+    transform: rotate(180deg);
+    animation: glide 4s ease-in-out infinite;
+}
+
+.permanent-hide {
+    display: none;
+}
+
+@keyframes glide {
+    0%, 10%, 100% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(-10px);
+    }
+    60% {
+        transform: translateX(0px);
+    }
+}
+
+
+
+
+        .hover-text.visible {
+            opacity: 1;
+        }
+
+        .fade-out {
+            animation: fadeOut 0.5s forwards;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s forwards;
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+       
+        .iframe-disabled {
+      pointer-events: none;
+  }
+        
+    </style>
+</head>
+<body class="bg-black flex items-center justify-center min-h-screen">
+
+
+<div id="menuText" class="menu-text">
+    <svg class="chevron-svg" viewBox="0 0 24 24">
+        <path d="M8.59 16.59L13.17 12 8.59 7.41" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180, 12, 12)"/>
+    </svg>
+    MENU
+</div>
+
+
+
+<div class="iframe-container">
+    <iframe id="iframe" src="https://hansenhomeai.github.io/38510-SE/" allowfullscreen></iframe>
+</div>
+
+
+
+<div id="interiorTourBox" class="details-box hidden">
+    <div class="details">
+        <h1>Interior Tour</h1>
+        <p>Interior tour not linked for this property.</p>
+    </div>
+</div>
+
+
+
+
+    <div id="distanceDisplay" class="distance-display"></div>
+
+    <div id="darkBlurLayer" class="dark-blur-layer"></div>
+
+    <img id="shadowImage" src="https://raw.githubusercontent.com/HansenHomeAI/1Shadow/main/1Shadow.png" alt="Shadow" class="shadow-image">
+
+<div id="detailsBox" class="details-box hidden">
+
+<div class="details">
+        <h1>38510 SE 49TH ST Washougal, WA</h1>
+        <p>Perfect for your dream home, this property is fully prepared for construction. It features a well, septic approval, and a completed driveway. Additionally, there's a barn with two bays and a hayloft, offering both functionality and charm. The 2.83-acre lot boasts stunning natural beauty and is conveniently located just 30 minutes from PDX. Situated in the majestic Columbia River Gorge, this property has already received approval for building in the gorge and has building permits ready for use.</p>
+        
+
+
+</div>
+
+</div>
+
+
+<div id="spinner" class="spinner" style="display: none;"></div>
+
+
+<div id="creditsBox" class="credits-box hidden">
+    
+   
+    
+    <div class="credits">
+    <h1>Legal Notice</h1>
+   
+    <p>All rights reserved © 2024 Hansen Home AI LLC.</p>
+
+    </div>
+
+    
+</div>
+
+
+
+
+
+
+
+
+
+    <button id="mainButton" class="main-button">
+        <img src="https://raw.githubusercontent.com/HansenHomeAI/3TestIcons/main/3TestIcons.svg" alt="Logo"/>
+    </button>
+
+   <button id="iconButton1" class="icon-button" data-name="Credits">
+    <img src="https://raw.githubusercontent.com/HansenHomeAI/2Credits/main/2Credits.png" alt="Icon 1" class="icon-svg"/>
+</button>
+
+<button id="iconButton2" class="icon-button" data-name="Details">
+    <img src="https://raw.githubusercontent.com/HansenHomeAI/1Details/main/1Details.png" alt="Icon 2" class="icon-svg"/>
+</button>
+
+<button id="iconButton3" class="icon-button" data-name="Interior Tour">
+    <img src="https://raw.githubusercontent.com/HansenHomeAI/1Interior/main/1Interior.png" alt="Icon 3" class="icon-svg"/>
+</button>
+
+<button id="iconButton4" class="icon-button" data-name="Full Screen">
+    <img src="https://raw.githubusercontent.com/HansenHomeAI/1FullScreen/main/1FullScreen.png" alt="Icon 4" class="icon-svg"/>
+</button>
+
+
+
+    <div id="hoverTextBox" class="hover-text">Menu</div>
+
+    <div id="debugCircle" class="debug-circle"></div>
+    <div id="blueSquare" class="blue-square"></div>
+
+    <script>
+        
+const fullScreenImageSrc = 'https://raw.githubusercontent.com/HansenHomeAI/1FullScreen/main/1FullScreen.png';
+const minimizeImageSrc = 'https://raw.githubusercontent.com/HansenHomeAI/1Minimize/main/1Minimize.png';
+const interiorTourImageSrc = 'https://raw.githubusercontent.com/HansenHomeAI/1Interior/main/1Interior.png';
+const exteriorTourImageSrc = 'https://raw.githubusercontent.com/HansenHomeAI/1ExteriorTour/main/1ExteriorTour.png';
+
+
+
+
+
+
+// Prevent context menu from appearing on right-click or long press
+document.addEventListener('contextmenu', function(event) {
+    event.preventDefault();
+});
+
+// Prevent text selection on double-click
+document.addEventListener('mousedown', function(event) {
+    if (event.detail > 1) {
+        event.preventDefault();
+    }
+}, false);
+
+
+
+
+
+
+function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch((err) => {
+            console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function updateButtonLabel(button) {
+    if (document.fullscreenElement) {
+        button.querySelector('img').src = minimizeImageSrc;
+        button.dataset.name = 'Minimize';
+    } else {
+        button.querySelector('img').src = fullScreenImageSrc;
+        button.dataset.name = 'Full Screen';
+    }
+}
+
+
+
+document.getElementById('iconButton4').addEventListener('click', function() {
+    toggleFullScreen();
+    updateButtonLabel(this);
+});
+
+
+document.addEventListener('fullscreenchange', () => {
+    const button = document.getElementById('iconButton4');
+    updateButtonLabel(button);
+});
+
+
+
+
+
+// Add this variable to track if the interior tour link is available
+const interiorTourLink = ''; // Set this to the interior tour link if available, otherwise keep it empty
+
+// Event listener for the interior tour icon button click
+document.getElementById('iconButton3').addEventListener('click', function(event) {
+    event.stopPropagation();
+
+    if (interiorTourLink) {
+        showSpinnerForDuration(); // Call the function to show the spinner for 10 seconds
+        window.location.href = interiorTourLink; // Open the link in the current tab
+        // window.open(interiorTourLink); // Open the link in a new tab or window
+    } else {
+        const interiorTourBox = document.getElementById('interiorTourBox');
+        interiorTourBox.classList.add('visible');
+        interiorTourBox.classList.remove('hidden');
+        setTimeout(() => {
+            interiorTourBox.style.opacity = '1';
+            interiorTourBox.style.transform = 'translate(-50%, -50%) scale(1)';
+        }, 10); // Small timeout for transition effect
+    }
+});
+
+// Hide interior tour box when clicking outside of it
+document.addEventListener('click', function(event) {
+    const interiorTourBox = document.getElementById('interiorTourBox');
+    if (!interiorTourBox.contains(event.target)) {
+        interiorTourBox.style.opacity = '0';
+        interiorTourBox.style.transform = 'translate(-50%, -50%) scale(0.95)';
+        setTimeout(() => {
+            interiorTourBox.classList.remove('visible');
+            interiorTourBox.classList.add('hidden');
+        }, 200); // Reduced timeout for immediate hiding
+    }
+});
+
+// Event listener for the interior tour icon button click
+document.getElementById('iconButton3').addEventListener('click', function(event) {
+    event.stopPropagation();
+
+    if (interiorTourLink) {
+        showSpinnerForDuration(); // Call the function to show the spinner for 10 seconds
+        window.location.href = interiorTourLink; // Open the link in the current tab
+        // window.open(interiorTourLink); // Open the link in a new tab or window
+    } else {
+        showTextbox('interiorTourBox');
+    }
+});
+
+
+
+
+const spinner = document.getElementById('spinner');
+
+// Function to show the spinner and hide it after 10 seconds
+function showSpinnerForDuration() {
+    const spinner = document.getElementById('spinner');
+    spinner.style.display = 'block'; // Show the spinner
+    spinner.style.opacity = '1'; // Ensure spinner is fully visible
+
+    // Hide the spinner after 10 seconds
+    setTimeout(() => {
+        spinner.style.opacity = '0'; // Fade out
+        setTimeout(() => {
+            spinner.style.display = 'none'; // Completely hide spinner
+        }, 1000); // Allow time for fade out transition (1 second)
+    }, 4000); // 10000 milliseconds = 10 seconds
+}
+
+
+
+
+
+
+
+// Show credits box when 'credits' icon is clicked
+document.getElementById('iconButton1').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+    const creditsBox = document.getElementById('creditsBox');
+    creditsBox.classList.add('visible');
+    creditsBox.classList.remove('hidden');
+    setTimeout(() => {
+        creditsBox.style.opacity = '1';
+        creditsBox.style.transform = 'translate(-50%, -50%) scale(1)';
+    }, 10); // Small timeout for transition effect
+});
+
+// Hide credits box when clicking outside of it
+document.addEventListener('click', function(event) {
+    const creditsBox = document.getElementById('creditsBox');
+    if (!creditsBox.contains(event.target)) {
+        creditsBox.style.opacity = '0';
+        creditsBox.style.transform = 'translate(-50%, -50%) scale(0.95)';
+        setTimeout(() => {
+            creditsBox.classList.remove('visible');
+            creditsBox.classList.add('hidden');
+        }, 200); // Reduced timeout for immediate hiding
+    }
+});
+
+// Show credits box when 'credits' icon is clicked
+document.getElementById('iconButton1').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+    showTextbox('creditsBox');
+});
+
+
+
+
+
+
+
+
+
+
+
+// Show details box when 'details' icon is clicked
+document.getElementById('iconButton2').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+    const detailsBox = document.getElementById('detailsBox');
+    detailsBox.classList.add('visible');
+    detailsBox.classList.remove('hidden');
+    setTimeout(() => {
+        detailsBox.style.opacity = '1';
+        detailsBox.style.transform = 'translate(-50%, -50%) scale(1)';
+    }, 10); // Small timeout for transition effect
+});
+
+// Hide details box when clicking outside of it
+document.addEventListener('click', function(event) {
+    const detailsBox = document.getElementById('detailsBox');
+    if (!detailsBox.contains(event.target)) {
+        detailsBox.style.opacity = '0';
+        detailsBox.style.transform = 'translate(-50%, -50%) scale(0.95)';
+        setTimeout(() => {
+            detailsBox.classList.remove('visible');
+            detailsBox.classList.add('hidden');
+        }, 200); // Reduced timeout for immediate hiding
+    }
+});
+
+// Show details box when 'details' icon is clicked
+document.getElementById('iconButton2').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+    showTextbox('detailsBox');
+});
+
+
+
+
+
+
+
+
+
+
+    let displayDistance; // We will calculate this dynamically
+    
+        
+        function positionMainButton() {
+    const mainButton = document.getElementById('mainButton');
+    const minDistance = Math.min(window.innerWidth * 0.1, window.innerHeight * 0.1);
+    mainButton.style.left = `${minDistance}px`;
+    mainButton.style.bottom = `${minDistance}px`;
+    updateDistanceDisplay();
+}
+
+function updateDistanceDisplay() {
+    const mainButton = document.getElementById('mainButton');
+    const distanceDisplay = document.getElementById('distanceDisplay');
+    const rect = mainButton.getBoundingClientRect();
+    const distanceFromLeft = rect.left;
+    distanceDisplay.textContent = `Distance from left: ${Math.round(distanceFromLeft)}px`;
+
+    // Update the hover text box position based on distance from left and right
+    const hoverTextBox = document.getElementById('hoverTextBox');
+    displayDistance = distanceFromLeft; // Use distanceFromLeft as the dynamic distance
+    
+    // Set left and right positions based on distance
+    hoverTextBox.style.left = `${displayDistance}px`;
+    hoverTextBox.style.top = `${displayDistance}px`;
+    hoverTextBox.style.right = `${displayDistance}px`;
+}
+
+
+
+window.addEventListener('resize', () => {
+    scaleUI();
+    updateDistanceDisplay();
+});
+window.addEventListener('load', () => {
+    scaleUI();
+    updateDistanceDisplay();
+});
+
+
+
+
+
+function scaleUI() {
+    const mainButton = document.getElementById('mainButton');
+    const iconButtons = document.querySelectorAll('.icon-button');
+    const hoverTextBox = document.getElementById('hoverTextBox');
+
+    const originalMainButtonWidth = 50; // Original width in px
+    const originalIconButtonWidth = 35; // Original icon button width in px
+    const originalTextBoxFontSize = 2.5; // Original font size in rem
+
+    // Calculate scale factor
+    const scaleFactor = Math.min(1, window.innerWidth * 0.25 / originalMainButtonWidth) * 1.2;
+
+    // Apply scaling
+    mainButton.style.width = `${originalMainButtonWidth * scaleFactor}px`;
+    mainButton.style.height = `${originalMainButtonWidth * scaleFactor}px`;
+    mainButton.style.fontSize = `${16 * scaleFactor}px`; // Adjust font size accordingly
+
+    iconButtons.forEach((button) => {
+        button.style.width = `${originalIconButtonWidth * scaleFactor}px`;
+        button.style.height = `${originalIconButtonWidth * scaleFactor}px`;
+        button.style.fontSize = `${12 * scaleFactor}px`; // Adjust font size accordingly
+    });
+
+    // Scale the text box font size
+    const hoverTextFontSize = originalTextBoxFontSize * scaleFactor; // Calculate scaled font size
+    hoverTextBox.style.fontSize = `${hoverTextFontSize}rem`; // Apply the font size
+
+    positionMainButton();
+    updateIconButtonPositions(); // Update icon button positions
+    updateDistanceDisplay(); // Update hover text box position
+}
+
+window.addEventListener('resize', scaleUI);
+window.addEventListener('load', scaleUI);
+
+
+
+
+window.addEventListener('resize', () => {
+    scaleUI();
+    updateIconButtonPositions(); // Ensure icon positions are updated on resize
+});
+
+document.getElementById('mainButton').addEventListener('mousemove', () => {
+    updateIconButtonPositions(); // Ensure icon positions are updated on main button move
+});
+
+window.addEventListener('load', () => {
+    scaleUI();
+    updateIconButtonPositions(); // Ensure positions are calculated on load
+});
+
+
+
+
+
+        function updateIconButtonPositions() {
+    const mainButton = document.getElementById('mainButton');
+    const iconButtons = document.querySelectorAll('.icon-button');
+    const radius = 65 * Math.min(1, window.innerWidth * 0.25 / 50); // Adjust radius proportionally
+    const numIcons = iconButtons.length;
+    const angleStep = Math.PI / 4.1; // Adjusted angle step for better spacing
+    const totalSpread = (numIcons - 1) * angleStep; // Total angular spread of icons
+    const baseAngle = (Math.PI / 4) - (totalSpread / 2); // Center spread around 45 degrees
+
+    // Get the center of the main button
+    const rect = mainButton.getBoundingClientRect();
+    const mainButtonCenterX = rect.left + window.scrollX + rect.width / 2;
+    const mainButtonCenterY = rect.top + window.scrollY + rect.height / 2;
+
+    iconButtons.forEach((button, index) => {
+        const angle = baseAngle + (index * angleStep); // Calculate angle clockwise
+        const offsetX = Math.cos(angle) * radius;
+        const offsetY = Math.sin(angle) * radius;
+        // Calculate the position from the center of the main button
+        if (button.classList.contains('visible')) {
+            button.style.left = `${mainButtonCenterX + offsetX - button.offsetWidth / 2}px`;
+            button.style.top = `${mainButtonCenterY - offsetY - button.offsetHeight / 2}px`;
+        } else {
+            // Return to origin when not visible
+            button.style.left = `${mainButtonCenterX - button.offsetWidth / 2}px`;
+            button.style.top = `${mainButtonCenterY - button.offsetHeight / 2}px`;
+        }
+    });
+}
+
+
+        window.addEventListener('resize', scaleUI);
+        window.addEventListener('load', scaleUI);
+
+        let initialClickPoint = null;
+        let isDragging = false;
+        let holdTimeout = null;
+        let iconButtons = Array.from(document.querySelectorAll('.icon-button'));
+        let mouseDownOnMainButton = false; // Track if the mouse is down on the main button
+        let backgroundHoverTimeout;
+
+        document.getElementById('mainButton').addEventListener('mousedown', function(event) {
+            // Store the initial click point
+            initialClickPoint = { x: event.clientX, y: event.clientY };
+            isDragging = false;
+            mouseDownOnMainButton = true; // Set the flag to true
+
+            // Set a timeout to detect a hold after 0.5 seconds
+            holdTimeout = setTimeout(() => {
+                isDragging = true;
+            }, 500);
+
+            // Add event listeners for mousemove and mouseup
+            document.addEventListener('mousemove', handleMouseMove);
+        });
+
+        function handleMouseMove(event) {
+            if (initialClickPoint && isDragging) {
+                const dx = event.clientX - initialClickPoint.x;
+                const dy = event.clientY - initialClickPoint.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > 10) {
+                    // Fan out the icons when the ray is activated
+                    toggleIcons(true);
+                }
+            }
+        }
+
+        function handleMouseUp(event) {
+            clearTimeout(holdTimeout); // Clear the hold timeout
+
+            const debugCircle = document.getElementById('debugCircle');
+            debugCircle.style.backgroundColor = debugCircle.style.backgroundColor === 'darkgreen' ? 'lightgreen' : 'darkgreen';
+            console.log("Mouse up detected");
+
+            // Check if mouse was down on the main button and up on an icon button
+            if (mouseDownOnMainButton) {
+                iconButtons.forEach((button) => {
+                    const rect = button.getBoundingClientRect();
+                    if (
+                        event.clientX >= rect.left &&
+                        event.clientX <= rect.right &&
+                        event.clientY >= rect.top &&
+                        event.clientY <= rect.bottom
+                    ) {
+                        console.log(`Icon ${button.textContent} selected`);
+                    }
+                });
+            }
+
+            initialClickPoint = null;
+            mouseDownOnMainButton = false; // Reset the flag
+            // Toggle icon button visibility
+            toggleIcons();
+
+            // Remove event listeners
+            document.removeEventListener('mousemove', handleMouseMove);
+        }
+
+        // Function to toggle icons visibility
+        function toggleIcons(forceVisible) {
+    const allVisible = iconButtons.every(button =>
+        button.classList.contains('visible'));
+    const newState = (typeof forceVisible === 'boolean') ? forceVisible : !allVisible;
+
+    // Reverse the order of the animation
+    iconButtons.slice().reverse().forEach((button, index) => {
+        setTimeout(() => {
+            if (newState) {
+                button.classList.add('visible');
+                button.style.pointerEvents = 'auto'; // Ensure pointer events are enabled
+                button.style.transform = 'scale(1)'; // Scale up to full size when visible
+            } else {
+                button.classList.remove('visible');
+                button.style.pointerEvents = 'none'; // Disable pointer events when not visible
+                button.style.transform = 'scale(0.5)'; // Scale down to 0 when not visible
+            }
+            updateIconButtonPositions(); // Update positions after toggling visibility
+        }, index * 50); // Stagger the animation
+    });
+
+    // Toggle darkened blurred background layer
+    const darkBlurLayer = document.getElementById('darkBlurLayer');
+    const hoverTextBox = document.getElementById('hoverTextBox');
+    if (newState) {
+        darkBlurLayer.classList.add('visible');
+        hoverTextBox.classList.add('visible');
+    } else {
+        darkBlurLayer.classList.remove('visible');
+        hoverTextBox.classList.remove('visible');
+    }
+}
+
+
+        // Add general mouseup event listener to the document
+        document.addEventListener('mouseup', function(event) {
+            handleMouseUp(event);
+            const debugCircle = document.getElementById('debugCircle');
+            debugCircle.style.backgroundColor = debugCircle.style.backgroundColor === 'darkgreen' ? 'lightgreen' : 'darkgreen';
+            console.log('Mouse up event detected, changing debug circle color');
+        });
+
+        // Function to handle mousedown and touchstart event for each button
+function handleMouseDown(button) {
+    button.addEventListener('mousedown', function() {
+        this.style.transform = 'scale(0.9)';
+    });
+    button.addEventListener('touchstart', function() {
+        this.style.transform = 'scale(0.8)';
+    });
+}
+
+// Function to handle mouseup and touchend event for each button
+function handleMouseUpButton(button) {
+    button.addEventListener('mouseup', function() {
+        this.style.transform = 'scale(1)';
+    });
+    button.addEventListener('touchend', function() {
+        this.style.transform = 'scale(1)';
+    });
+}
+
+// Apply the mouse and touch event handlers to the main button
+handleMouseDown(document.getElementById('mainButton'));
+handleMouseUpButton(document.getElementById('mainButton'));
+
+
+// Add touch event handlers to the main button
+document.getElementById('mainButton').addEventListener('touchstart', function() {
+    this.style.transform = 'scale(0.9)';
+});
+
+// Add click event handler to ensure icons are positioned correctly
+document.getElementById('mainButton').addEventListener('click', function() {
+    updateIconButtonPositions(); // Ensure icon positions are updated on click
+});
+
+// Add touchend event handler to the main button
+document.getElementById('mainButton').addEventListener('touchend', function() {
+    this.style.transform = 'scale(1)';
+});
+
+
+
+// Apply the event handlers to all icon buttons
+document.querySelectorAll('.icon-button').forEach(button => {
+    handleMouseDown(button);
+    handleMouseUpButton(button);
+    handleIconClick(button);
+});
+
+
+        // Function to handle click event for each icon button to toggle the blue square
+        function handleIconClick(button) {
+            button.addEventListener('click', function() {
+                const blueSquare = document.getElementById('blueSquare');
+                if (blueSquare.style.display === 'block') {
+                    blueSquare.style.display = 'none';
+                } else {
+                    blueSquare.style.display = 'block';
+                }
+            });
+        }
+
+        // Function to reset the icons' visibility on click outside
+        function handleClickOutside(event) {
+            const mainButton = document.getElementById('mainButton');
+            const mainButtonRect = mainButton.getBoundingClientRect();
+            if (
+                event.clientX < mainButtonRect.left ||
+                event.clientX > mainButtonRect.right ||
+                event.clientY < mainButtonRect.top ||
+                event.clientY > mainButtonRect.bottom
+            ) {
+                toggleIcons(false);
+            }
+        }
+
+        // Add event listener for clicks outside the main button to reset icons
+        document.addEventListener('click', handleClickOutside);
+
+        // Add event listener to change debug circle color on every mouseup event
+        document.addEventListener('mouseup', function() {
+            const debugCircle = document.getElementById('debugCircle');
+            debugCircle.style.backgroundColor = debugCircle.style.backgroundColor === 'darkgreen' ? 'lightgreen' : 'darkgreen';
+            console.log('Mouse up event detected, changing debug circle color');
+        });
+
+        let clearTextTimeout;
+        let lastHoveredIcon = null;
+        let hoverDelay = 300; // Minimum delay before updating the text
+        const backgroundHoverDelay = 2000; // Delay before showing "Back" when hovering over background
+
+// Function to toggle icon names
+function toggleIconName(button, name1, name2, img1, img2) {
+    if (button.dataset.name === name1) {
+        button.dataset.name = name2;
+        button.querySelector('img').src = img2;
+    } else {
+        button.dataset.name = name1;
+        button.querySelector('img').src = img1;
+    }
+}
+
+
+// Add event listeners for icon name toggling
+// document.getElementById('iconButton3').addEventListener('click', function() {
+   // toggleIconName(this, 'Interior Tour', 'Exterior Tour', interiorTourImageSrc, exteriorTourImageSrc);
+// });
+
+
+
+// Function to handle mouseenter event for each button to apply hover effect
+function handleMouseEnter(button) {
+    button.addEventListener('mouseenter', function() {
+        if (!document.getElementById('darkBlurLayer').classList.contains('visible')) return;
+        button.style.transform = 'scale(1.2)';
+        button.style.boxShadow = '0 8px 12px rgba(0, 0, 0, 0.2)';
+        clearTimeout(clearTextTimeout);
+        clearTimeout(backgroundHoverTimeout);
+        lastHoveredIcon = button;
+        setTimeout(() => {
+            if (lastHoveredIcon === button) {
+                updateHoverTextBox(button.dataset.name);
+            }
+        }, 100); // Delay for premium feel
+    });
+}
+
+// Function to handle mouseleave event for each button to remove hover effect
+function handleMouseLeave(button) {
+    button.addEventListener('mouseleave', function() {
+        if (!document.getElementById('darkBlurLayer').classList.contains('visible')) return;
+        button.style.transform = 'scale(1)';
+        button.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        lastHoveredIcon = null;
+        clearTextTimeout = setTimeout(() => {
+            if (!lastHoveredIcon) {
+                backgroundHoverTimeout = setTimeout(() => {
+                    if (!lastHoveredIcon) {
+                        updateHoverTextBox("Back");
+                    }
+                }, backgroundHoverDelay);
+            }
+        }, hoverDelay); // Delay clearing text
+    });
+}
+
+// Apply the hover event handlers to all icon buttons
+document.querySelectorAll('.icon-button').forEach(button => {
+    handleMouseEnter(button);
+    handleMouseLeave(button);
+});
+
+
+        // Apply the hover event handlers to the main button
+        const mainButton = document.getElementById('mainButton');
+        mainButton.addEventListener('mouseenter', function() {
+            if (!document.getElementById('darkBlurLayer').classList.contains('visible')) return;
+            mainButton.style.transform = 'scale(1.1)';
+            clearTimeout(clearTextTimeout);
+            clearTimeout(backgroundHoverTimeout);
+            lastHoveredIcon = mainButton;
+            setTimeout(() => {
+                if (lastHoveredIcon === mainButton) {
+                    updateHoverTextBox("Menu");
+                }
+            }, 100); // Delay for premium feel
+        });
+        mainButton.addEventListener('mouseleave', function() {
+            if (!document.getElementById('darkBlurLayer').classList.contains('visible')) return;
+            mainButton.style.transform = 'scale(1)';
+            lastHoveredIcon = null;
+            clearTextTimeout = setTimeout(() => {
+                if (!lastHoveredIcon) {
+                    backgroundHoverTimeout = setTimeout(() => {
+                        if (!lastHoveredIcon) {
+                            updateHoverTextBox("Back");
+                        }
+                    }, backgroundHoverDelay);
+                }
+            }, hoverDelay); // Delay clearing text
+        });
+
+        function updateHoverTextBox(text) {
+    const hoverTextBox = document.getElementById('hoverTextBox');
+    const mainButton = document.getElementById('mainButton');
+    const rect = mainButton.getBoundingClientRect();
+    const distanceFromLeft = rect.left;
+    const displayDistance = distanceFromLeft; // Use distanceFromLeft as the dynamic distance
+
+    hoverTextBox.style.left = `${displayDistance}px`;
+    hoverTextBox.style.top = `${displayDistance}px`;
+    hoverTextBox.style.right = `${displayDistance}px`;
+
+    hoverTextBox.classList.add('fade-out');
+    setTimeout(() => {
+        hoverTextBox.textContent = text;
+        hoverTextBox.classList.remove('fade-out');
+        hoverTextBox.classList.add('fade-in');
+        setTimeout(() => hoverTextBox.classList.remove('fade-in'), 500);
+    }, 300); // Slight delay for premium feel
+}
+
+
+        function clearHoverTextBox() {
+            const hoverTextBox = document.getElementById('hoverTextBox');
+            hoverTextBox.classList.add('fade-out');
+            setTimeout(() => {
+                hoverTextBox.textContent = 'Menu';
+                hoverTextBox.classList.remove('fade-out');
+                hoverTextBox.classList.add('fade-in');
+                setTimeout(() => hoverTextBox.classList.remove('fade-in'), 500);
+            }, 300); // Slight delay for premium feel
+        }
+        
+        function disableIframe() {
+    document.getElementById('iframe').classList.add('iframe-disabled');
+}
+
+function enableIframe() {
+    document.getElementById('iframe').classList.remove('iframe-disabled');
+}
+
+// Function to show a textbox and disable the iframe
+function showTextbox(textboxId) {
+    const textbox = document.getElementById(textboxId);
+    textbox.classList.add('visible');
+    textbox.classList.remove('hidden');
+    setTimeout(() => {
+        textbox.style.opacity = '1';
+        textbox.style.transform = 'translate(-50%, -50%) scale(1)';
+        disableIframe(); // Disable iframe interaction
+    }, 10); // Small timeout for transition effect
+}
+
+// Function to hide a textbox and enable the iframe
+function hideTextbox(event, textboxId) {
+    const textbox = document.getElementById(textboxId);
+    if (!textbox.contains(event.target)) {
+        textbox.style.opacity = '0';
+        textbox.style.transform = 'translate(-50%, -50%) scale(0.95)';
+        setTimeout(() => {
+            textbox.classList.remove('visible');
+            textbox.classList.add('hidden');
+            enableIframe(); // Enable iframe interaction
+        }, 200); // Reduced timeout for immediate hiding
+    }
+}
+
+// Hide textbox when clicking outside of it
+document.addEventListener('click', function(event) {
+    hideTextbox(event, 'interiorTourBox');
+    hideTextbox(event, 'creditsBox');
+    hideTextbox(event, 'detailsBox');
+});
+
+// Prevent textbox from closing when clicking inside
+document.getElementById('interiorTourBox').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+});
+
+document.getElementById('creditsBox').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+});
+
+document.getElementById('detailsBox').addEventListener('click', function(event) {
+    event.stopPropagation(); // Prevent event from bubbling up to the document
+});
+
+
+
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    const mainButton = document.getElementById('mainButton');
+    const menuText = document.getElementById('menuText');
+
+    // Function to show the "menu" text and chevron arrow
+    function showMenuText() {
+        if (!menuText.classList.contains('permanent-hide')) {
+            menuText.classList.add('visible');
+            updateMenuTextPosition();
+        }
+    }
+
+    // Function to hide the "menu" text and chevron arrow permanently
+    function hideMenuTextPermanently() {
+        menuText.classList.remove('visible');
+        menuText.classList.add('permanent-hide');
+    }
+
+    // Update the position of the "menu" text and chevron arrow
+    function updateMenuTextPosition() {
+        const rect = mainButton.getBoundingClientRect();
+        const menuTextRect = menuText.getBoundingClientRect();
+        menuText.style.top = `${rect.top + window.scrollY + (rect.height / 2) - (menuTextRect.height / 2) - 2.5}px`;
+        menuText.style.left = `${rect.right + 5}px`;
+    }
+
+    // Event listeners for various user interactions
+    document.addEventListener('mousemove', showMenuText);
+    document.addEventListener('mousedown', showMenuText);
+    document.addEventListener('mouseup', showMenuText);
+    document.addEventListener('touchstart', showMenuText);
+    document.addEventListener('touchend', showMenuText);
+    document.addEventListener('keydown', showMenuText);
+
+    // Hide "menu" text when the main button is opened
+    mainButton.addEventListener('click', hideMenuTextPermanently);
+
+    // Ensure the "menu" text is positioned correctly on window resize
+    window.addEventListener('resize', updateMenuTextPosition);
+});
+
+        
+    </script>
+</body>
+</html>

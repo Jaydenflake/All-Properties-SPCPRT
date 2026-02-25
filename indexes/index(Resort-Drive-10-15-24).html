@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000000; /* Set background to black */
+            touch-action: none; /* Disable default touch behaviors */
+            user-select: none; /* Disable text selection */
+            -webkit-user-select: none; /* Safari specific styling */
+        }
+        #vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(to top, black 0%, transparent 12%);
+            mix-blend-mode: multiply;
+        }
+    </style>
+</head>
+<body>
+    <div id="vignette"></div>
+    <div id="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">Lot #1</div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/",
+            "@lumaai/luma-web": "https://unpkg.com/@lumaai/luma-web@0.2.0/dist/library/luma-web.module.js"
+        }
+    }
+    </script>
+    <script type="module">
+        import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector3, SphereGeometry, CylinderGeometry, MeshBasicMaterial, Mesh, Texture, PlaneGeometry, DoubleSide, MeshStandardMaterial } from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+
+        import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+        import { LumaSplatsThree } from '@lumaai/luma-web';
+
+function isChrome() {
+    return /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+}
+
+        
+        // Parameters
+        const parameters = {
+    camera: {
+        minY: 0.1,
+        maxZoomOut: 1000,
+        startPosition: { x: 2, y: 0.8, z: 2 },
+    },
+    scene: {
+        origin: { x: 0, y: -0.15, z: 0 },
+        targetLimit: { x: 10, z: 10 }
+    },
+    animation: {
+        autoRotate: true,
+        startRadius: 3,
+        speed: -0.003,
+        initialAngle: Math.PI / 0.33  // Start at 45 degrees (in radians)
+    },
+    rebound: {
+        speed: 0.2,
+        elasticity: 0.05
+    },
+    maxDistance: {
+        base: 4,
+        responsiveness: 1.7
+    }
+};
+
+
+
+
+
+
+
+const hotspotConfigurations = [
+   //{ text: 'Public Water Tank', position: { x: -2.1, y: -0.06, z: 2.07 }, scale: 0.38 },
+    { text: 'Resort Dr', position: { x: -2.56, y: -0.9, z: -0.83 }, scale: 0.5 },
+    // Add more Hotspots here
+];
+
+
+
+
+
+
+
+	// Centralized control section for BorderDots and BorderLines
+const borderDotPositions = [
+    { name: 'BorderDot_1', position: { x: -0.15, y: -0.592, z: -2.5 } },
+    { name: 'BorderDot_2', position: { x: -0.15, y: -0.57, z: -2.25 } },
+	{ name: 'BorderDot_3', position: { x: 2.3, y: -0.11, z: -2.25 } },
+    { name: 'BorderDot_4', position: { x: 2.3, y: -0.48, z: -3.7 } },
+    { name: 'BorderDot_5', position: { x: 2.4, y: -0.65, z: -4.45 } },
+    { name: 'BorderDot_6', position: { x: 1.86, y: -0.86, z: -4.76 } },
+    { name: 'BorderDot_7', position: { x: 1.98, y: -0.86, z: -4.92 } },
+    { name: 'BorderDot_8', position: { x: 2.6, y: -0.68, z: -4.78 } },
+    { name: 'BorderDot_9', position: { x: 2.9, y: -0.58, z: -4.2 } },
+    { name: 'BorderDot_10', position: { x: 2.9, y: -0.11, z: -2.25 } },
+    
+    { name: 'BorderDot_11', position: { x: 3.25, y: -0.15, z: -2.25 } },
+    { name: 'BorderDot_12', position: { x: 3.25, y: -0.02, z: -1.37 } },
+    { name: 'BorderDot_13', position: { x: 3.25, y: -0.3, z: -0.23 } },
+    { name: 'BorderDot_14', position: { x: 2.5, y: -0.39, z: -0.23 } },
+    { name: 'BorderDot_15', position: { x: 2, y: -0.25, z: -0.23 } },
+    { name: 'BorderDot_16', position: { x: 1.7, y: -0.28, z: -0.23 } },
+    { name: 'BorderDot_17', position: { x: 1.34, y: -0.17, z: -0.23 } },
+    { name: 'BorderDot_18', position: { x: 1.34, y: -0.25, z: 1.3 } },
+    { name: 'BorderDot_19', position: { x: 1.34, y: -0.48, z: 1.87 } },
+
+	{ name: 'BorderDot_20', position: { x: 0.7, y: -0.48, z: 1.87 } },
+    { name: 'BorderDot_21', position: { x: 0.43, y: -0.39, z: 2.3 } },
+    { name: 'BorderDot_22', position: { x: -0.11, y: -0.33, z: 3.1 } },
+    { name: 'BorderDot_23', position: { x: -0.452, y: -0.49, z: 3.6 } },
+    { name: 'BorderDot_24', position: { x: -0.67, y: -0.46, z: 3.93 } },
+
+	{ name: 'BorderDot_25', position: { x: -0.9, y: -0.36, z: 3.93 } },
+	{ name: 'BorderDot_26', position: { x: -1.9, y: -0.39, z: 3.93 } },
+	{ name: 'BorderDot_27', position: { x: -2.7, y: -0.39, z: 3.93 } },
+	{ name: 'BorderDot_28', position: { x: -2.7, y: -0.12, z: 2.5 } },
+	{ name: 'BorderDot_29', position: { x: -2.7, y: -0.1, z: 1.95 } },
+	{ name: 'BorderDot_30', position: { x: -2.2, y: -0.04, z: 1.95 } },
+	
+	{ name: 'BorderDot_31', position: { x: -2.2, y: -0.07, z: 2.14 } },
+	{ name: 'BorderDot_32', position: { x: -1.97, y: -0.07, z: 2.14 } },
+	{ name: 'BorderDot_33', position: { x: -1.97, y: -0.03, z: 1.95 } },
+	{ name: 'BorderDot_34', position: { x: -0.67, y: -0.09, z: 1.95 } },
+	{ name: 'BorderDot_35', position: { x: -0.67, y: -0.035, z: 0.43 } },
+	{ name: 'BorderDot_36', position: { x: -0.67, y: -0.25, z: -0.23 } },
+	
+	{ name: 'BorderDot_37', position: { x: -1.95, y: -0.65, z: -0.23 } },
+	{ name: 'BorderDot_38', position: { x: -2.7, y: -0.75, z: -0.23 } },
+	{ name: 'BorderDot_39', position: { x: -2.7, y: -0.91, z: -0.7 } },
+	{ name: 'BorderDot_40', position: { x: -2.55, y: -0.91, z: -0.75 } },
+	{ name: 'BorderDot_41', position: { x: -2.55, y: -0.78, z: -0.4 } },
+	{ name: 'BorderDot_42', position: { x: -2.32, y: -0.75, z: -0.45 } },
+	{ name: 'BorderDot_43', position: { x: -2.1, y: -0.8, z: -0.75 } },
+	{ name: 'BorderDot_44', position: { x: -1.4, y: -0.59, z: -0.75 } },
+	{ name: 'BorderDot_45', position: { x: -1.4, y: -0.72, z: -1.37 } },
+
+
+    // Add more BorderDots here by simply adding more objects
+];
+
+const borderLineConnections = [
+    { start: 'BorderDot_1', end: 'BorderDot_2' },
+    { start: 'BorderDot_2', end: 'BorderDot_3' },
+ 	{ start: 'BorderDot_3', end: 'BorderDot_4' },
+    { start: 'BorderDot_4', end: 'BorderDot_5' },
+ 	{ start: 'BorderDot_5', end: 'BorderDot_6' },
+    { start: 'BorderDot_6', end: 'BorderDot_7' },
+ 	{ start: 'BorderDot_7', end: 'BorderDot_8' },
+    { start: 'BorderDot_8', end: 'BorderDot_9' },
+    { start: 'BorderDot_9', end: 'BorderDot_10' },
+	
+	{ start: 'BorderDot_10', end: 'BorderDot_11' },
+ 	{ start: 'BorderDot_11', end: 'BorderDot_12' },
+    { start: 'BorderDot_12', end: 'BorderDot_13' },
+    { start: 'BorderDot_13', end: 'BorderDot_14' },
+	{ start: 'BorderDot_14', end: 'BorderDot_15' },
+ 	{ start: 'BorderDot_15', end: 'BorderDot_16' },
+    { start: 'BorderDot_16', end: 'BorderDot_17' },
+    { start: 'BorderDot_17', end: 'BorderDot_18' },
+	{ start: 'BorderDot_18', end: 'BorderDot_19' },
+	
+	{ start: 'BorderDot_19', end: 'BorderDot_20' },
+ 	{ start: 'BorderDot_20', end: 'BorderDot_21' },
+    { start: 'BorderDot_21', end: 'BorderDot_22' },
+    { start: 'BorderDot_22', end: 'BorderDot_23' },
+	{ start: 'BorderDot_23', end: 'BorderDot_24' },
+	
+	{ start: 'BorderDot_24', end: 'BorderDot_25' },
+    { start: 'BorderDot_25', end: 'BorderDot_26' },
+	{ start: 'BorderDot_26', end: 'BorderDot_27' },
+	{ start: 'BorderDot_27', end: 'BorderDot_28' },
+    { start: 'BorderDot_28', end: 'BorderDot_29' },
+	{ start: 'BorderDot_29', end: 'BorderDot_30' },
+	
+	{ start: 'BorderDot_30', end: 'BorderDot_31' },
+    { start: 'BorderDot_31', end: 'BorderDot_32' },
+	{ start: 'BorderDot_32', end: 'BorderDot_33' },
+	{ start: 'BorderDot_33', end: 'BorderDot_34' },
+    { start: 'BorderDot_34', end: 'BorderDot_35' },
+	{ start: 'BorderDot_35', end: 'BorderDot_36' },
+	
+	{ start: 'BorderDot_36', end: 'BorderDot_37' },
+    { start: 'BorderDot_37', end: 'BorderDot_38' },
+	{ start: 'BorderDot_38', end: 'BorderDot_39' },
+	{ start: 'BorderDot_39', end: 'BorderDot_40' },
+    { start: 'BorderDot_40', end: 'BorderDot_41' },
+	{ start: 'BorderDot_41', end: 'BorderDot_42' },
+	{ start: 'BorderDot_42', end: 'BorderDot_43' },
+    { start: 'BorderDot_43', end: 'BorderDot_44' },
+	{ start: 'BorderDot_44', end: 'BorderDot_45' },
+	{ start: 'BorderDot_45', end: 'BorderDot_1' },
+    { start: 'BorderDot_46', end: 'BorderDot_47' },
+	{ start: 'BorderDot_47', end: 'BorderDot_48' },
+	
+	
+	
+    // Add more BorderLine connections here
+];
+
+
+
+
+
+
+
+
+
+
+// Border Dot Parameters
+const borderDotParams = {
+    radius: 0.016, // Smaller radius than the white dots
+    widthSegments: 16, // Less detail since these are smaller
+    heightSegments: 16,
+    color: 0xffa500 // Orange color for differentiation (can be changed later)
+};
+
+
+
+
+
+if (isChrome()) {
+    parameters.animation.speed *= 0.5;
+}
+
+        
+        let renderer = new WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(new Color(0x000000)); // Renderer clear color set to black
+        renderer.setPixelRatio(window.devicePixelRatio * 0.8);
+        document.body.appendChild(renderer.domElement);
+
+        let scene = new Scene();
+
+        let camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, parameters.camera.maxZoomOut);
+        camera.position.set(parameters.camera.startPosition.x, parameters.camera.startPosition.y, parameters.camera.startPosition.z);
+
+        let controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+
+        let sceneCenter = new Vector3(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
+
+        controls.addEventListener('change', () => {
+            // Restrict camera Y minimum
+            if (camera.position.y < parameters.camera.minY) {
+                camera.position.y += (parameters.camera.minY - camera.position.y) * parameters.rebound.speed;
+            }
+
+            // Restrict target movement on X and Z axes with elastic rebound
+            const clampRebound = (current, min, max) => {
+                let clamped = Math.min(Math.max(current, min), max);
+                return clamped + (current - clamped) * parameters.rebound.elasticity;
+            };
+            controls.target.x = clampRebound(controls.target.x, -parameters.scene.targetLimit.x, parameters.scene.targetLimit.x);
+            controls.target.y = parameters.scene.origin.y; // Set target Y limit
+            controls.target.z = clampRebound(controls.target.z, -parameters.scene.targetLimit.z, parameters.scene.targetLimit.z);
+
+            // Restrict camera distance from the scene center
+            const maxDistance = calculateMaxDistance();  // Get the updated max distance
+if (camera.position.distanceTo(sceneCenter) > maxDistance) {
+    let direction = new Vector3().subVectors(camera.position, sceneCenter).normalize();
+    camera.position.copy(direction.multiplyScalar(maxDistance).add(sceneCenter));
+}
+
+        });
+
+        let splat = new LumaSplatsThree({
+    source: 'https://lumalabs.ai/embed/35cc80fe-6469-40f1-a21e-28a4af96c3ab?mode=sparkles&background=%23ffffff&color=%23000000&showTitle=true&loadBg=true&logoPosition=bottom-left&infoPosition=bottom-right&cinematicVideo=undefined&showMenu=false',
+    particleRevealEnabled: true,
+    particleRevealDuration: 3.33 // Speed up by 50%
+});
+
+// Apply depth testing and lower render order for the splat
+splat.material.depthTest = true;
+splat.renderOrder = 999;  // Ensure the splat is rendered before the border
+
+// Shift the Luma Splat along the x, y, and z axes to align with your origin
+splat.position.set(0, 0, 0);  // Adjust these values to shift your splat as needed
+splat.rotation.y = Math.PI / 3.36;  // Rotate 45 degrees to the left
+
+scene.add(splat);
+
+
+
+
+const totalHotspots = hotspotConfigurations.length;
+const hotspots = hotspotConfigurations.map((config, index) => createHotspot(config, index, totalHotspots));
+
+
+
+
+
+
+function calculateMaxDistance() {
+    const aspectRatio = window.innerWidth / window.innerHeight;
+
+    // Taller aspect ratios (e.g., mobile) allow more max distance
+    let additionalDistance = (1 / aspectRatio) * parameters.maxDistance.responsiveness;
+
+    // Ensure the max distance scales based on the aspect ratio
+    const maxDistance = parameters.maxDistance.base + additionalDistance;
+
+    return maxDistance;
+}
+
+
+
+
+
+
+
+
+
+
+
+// Function to create a BorderDot based on position data
+function createBorderDot(dotData) {
+    const { name, position } = dotData;
+    let borderDotGeometry = new SphereGeometry(borderDotParams.radius, borderDotParams.widthSegments, borderDotParams.heightSegments);
+    let borderDotMaterial = new MeshBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0 }); // Start with opacity 0
+    let borderDot = new Mesh(borderDotGeometry, borderDotMaterial);
+
+    // Set the position
+    borderDot.position.set(position.x, position.y, position.z);
+    
+    // Add the border dot to the scene
+    scene.add(borderDot);
+    
+    return { name, mesh: borderDot };
+}
+
+
+
+// Define the radial segments and material for the cylinders (BorderLines)
+const cylinderRadialSegments = 32; // Radial segments for smoother cylinders
+const cylinderMaterial = new MeshBasicMaterial({ color: 0xffa500 }); // White color for BorderLines
+
+
+
+// Function to create a BorderLine between two BorderDots
+function createBorderLineBetweenDots(dot1, dot2) {
+    const direction = new Vector3().subVectors(dot2.position, dot1.position);
+    const length = direction.length();
+    const cylinderGeometry = new CylinderGeometry(borderDotParams.radius, borderDotParams.radius, length, cylinderRadialSegments);
+    const cylinderMaterial = new MeshBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0 }); // Start with opacity 0
+    const cylinder = new Mesh(cylinderGeometry, cylinderMaterial);
+
+    const midpoint = new Vector3().addVectors(dot1.position, dot2.position).multiplyScalar(0.5);
+    cylinder.position.copy(midpoint);
+
+    const axis = new Vector3(0, 1, 0);  // Default cylinder direction (Y-axis)
+    cylinder.quaternion.setFromUnitVectors(axis.normalize(), direction.clone().normalize());
+
+    // Add the cylinder (BorderLine) to the scene
+    scene.add(cylinder);
+
+    return cylinder;
+}
+
+
+
+
+
+let fadeDuration = 5; // Duration of the fade-in in seconds
+let borderDotDelay = 0.9; // Delay for BorderDots (in seconds)
+let fadeStartTime = null; // Start time of the fade
+
+// Animate function for fade-in effect
+function fadeInBorders(time) {
+    if (!fadeStartTime) fadeStartTime = time; // Initialize the start time
+    let elapsedTime = (time - fadeStartTime) / 1000; // Convert time to seconds
+
+    // Calculate the current opacity for BorderLines (no delay)
+    let lineOpacity = Math.min(elapsedTime / fadeDuration, 1);
+
+    // Calculate the current opacity for BorderDots (with delay)
+    let dotElapsedTime = elapsedTime - borderDotDelay; // Subtract the delay for dots
+    let dotOpacity = Math.min(Math.max(dotElapsedTime / fadeDuration, 0), 1); // Ensure it doesn’t go below 0
+
+    // Update opacity of all BorderLines (fade in first)
+    borderLines.forEach(cylinder => {
+        cylinder.material.opacity = lineOpacity;
+    });
+
+    // Update opacity of all BorderDots (fade in with delay)
+    Object.values(borderDots).forEach(dot => {
+        dot.material.opacity = dotOpacity;
+    });
+
+    // Continue the fade-in effect until both opacities reach 1
+    if (lineOpacity < 1 || dotOpacity < 1) {
+        requestAnimationFrame(fadeInBorders);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Store BorderDots and BorderLines
+const borderDots = {};
+const borderLines = [];
+
+// Create BorderDots from the centralized control section
+borderDotPositions.forEach(dotData => {
+    const createdDot = createBorderDot(dotData);
+    borderDots[createdDot.name] = createdDot.mesh;
+});
+
+// Create BorderLines based on connections
+borderLineConnections.forEach(connection => {
+    const dot1 = borderDots[connection.start];
+    const dot2 = borderDots[connection.end];
+    if (dot1 && dot2) {
+        const borderLine = createBorderLineBetweenDots(dot1, dot2);
+        borderLines.push(borderLine);  // Store the created line
+    }
+});
+
+
+
+// Create BorderDots and BorderLines (after existing code)
+requestAnimationFrame(fadeInBorders); // Start the fade-in sequence
+
+
+
+function createHotspot(hotspotConfig, index, totalHotspots) {
+    const { text, position, scale } = hotspotConfig;
+
+    // Create the dot
+    let dotGeometry = new SphereGeometry(0.03, 32, 32);
+    let dotMaterial = new MeshBasicMaterial({ color: 0xffffff });
+    let dot = new Mesh(dotGeometry, dotMaterial);
+    dot.position.set(position.x, position.y, position.z);
+    dot.scale.setScalar(scale);
+    scene.add(dot);
+
+    // Create canvas for text
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 3072;  // Adjust the width for larger text if needed
+    canvas.height = 512;
+    context.fillStyle = 'rgba(255, 255, 255, 0)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Set the font to "Helvetica Neue Bold" with fallback options
+    context.font = '520 250px "Helvetica Neue", Helvetica, Arial, sans-serif';
+    
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    context.lineWidth = 5;
+    context.fillStyle = 'white';  // Set the fill color for the text
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
+    context.strokeText(text, canvas.width / 2, canvas.height / 2);
+
+    // Create texture from canvas
+    const texture = new Texture(canvas);
+    texture.needsUpdate = true;
+
+    // Create plane geometry and mesh for the text
+    const geometry = new PlaneGeometry(2.4, 0.4);  // Match the canvas width
+    const material = new MeshStandardMaterial({
+        map: texture,
+        transparent: false,
+        alphaTest: 0.5,
+        side: DoubleSide,
+        premultipliedAlpha: true,
+        emissive: 'white',
+        emissiveIntensity: 2,
+    });
+    const textPlane = new Mesh(geometry, material);
+
+    // Position and rotate text plane
+    textPlane.position.set(position.x, position.y, position.z);
+    textPlane.rotation.y = Math.PI / 2;
+    textPlane.scale.setScalar(scale);
+
+    // IMPORTANT HEIGHT CONTROL: Adjust the y-translation dynamically
+    const yTranslation = 0.3 - (index / totalHotspots) * 0.05;
+    textPlane.geometry.translate(0, yTranslation, 0); 
+
+    scene.add(textPlane);
+
+    return { dot, textPlane };
+}
+
+
+
+
+
+
+
+
+
+
+
+        window.addEventListener('resize', function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Recalculate max distance based on new screen size
+    parameters.scene.maxDistanceFromCenter = calculateMaxDistance();
+});
+
+
+        
+
+        let angle = parameters.animation.initialAngle !== undefined ? parameters.animation.initialAngle : 0;
+        let autoRotate = parameters.animation.autoRotate;
+
+        function animate() {
+    if (autoRotate) {
+        angle += parameters.animation.speed;
+        camera.position.x = Math.sin(angle) * parameters.animation.startRadius;
+        camera.position.z = Math.cos(angle) * parameters.animation.startRadius;
+        camera.lookAt(scene.position); // Ensure the camera always looks at the scene
+    }
+
+    // Make sure each text plane faces the camera
+    hotspots.forEach(hotspot => {
+        hotspot.textPlane.lookAt(camera.position);
+    });
+
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+        
+
+controls.addEventListener('start', () => autoRotate = false);
+        window.addEventListener('touchstart', () => autoRotate = false);
+
+        animate();
+    </script>
+    <script>
+
+let targetFPS = 60; // Target FPS for optimal performance
+let currentFPS = 60; // Initially assume 60 FPS for optimal performance
+let maxPixelRatio = 2; // Maximum pixel ratio for high-performance devices
+let smoothedPixelRatio = window.devicePixelRatio; // Initially set to device pixel ratio
+let smoothingFactor = 0.1; // Smoothing factor for adjusting pixel ratio
+
+// Function to measure FPS
+function measureFPS() {
+    // Measure FPS here and update currentFPS variable
+    // This could be done by calculating the time between frames
+    // For simplicity, let's assume currentFPS is updated externally
+}
+
+// Function to adjust pixel ratio based on measured FPS
+function adjustPixelRatio() {
+    let adjustmentFactor = Math.max(0.3, Math.min(1, currentFPS / targetFPS)); // Clamp adjustment factor between 0.3 and 1
+    let newPixelRatio = Math.floor(window.devicePixelRatio * adjustmentFactor);
+    
+    // Smooth the adjustment using exponential smoothing
+    smoothedPixelRatio += (newPixelRatio - smoothedPixelRatio) * smoothingFactor;
+    
+    // Clamp the smoothed pixel ratio to avoid extreme values
+    smoothedPixelRatio = Math.max(1, Math.min(maxPixelRatio, smoothedPixelRatio));
+    
+    renderer.setPixelRatio(smoothedPixelRatio);
+}
+
+// Function to animate the scene
+function animate() {
+    measureFPS(); // Measure FPS before rendering each frame
+    adjustPixelRatio(); // Adjust pixel ratio based on measured FPS
+    // Render your scene here
+    requestAnimationFrame(animate);
+}
+
+    </script>
+
+</body>
+</html>

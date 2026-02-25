@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000000; /* Set background to black */
+            touch-action: none; /* Disable default touch behaviors */
+            user-select: none; /* Disable text selection */
+            -webkit-user-select: none; /* Safari specific styling */
+        }
+        #vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(to top, black 0%, transparent 12%);
+            mix-blend-mode: multiply;
+        }
+    </style>
+</head>
+<body>
+    <div id="vignette"></div>
+    <div id="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">Lot #1</div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/",
+            "@lumaai/luma-web": "https://unpkg.com/@lumaai/luma-web@0.2.0/dist/library/luma-web.module.js"
+        }
+    }
+    </script>
+    <script type="module">
+        import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector3, SphereGeometry, MeshBasicMaterial, Mesh, Texture, PlaneGeometry, DoubleSide, MeshStandardMaterial } from 'https://unpkg.com/three@0.157.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.157.0/examples/jsm/controls/OrbitControls.js';
+        import { LumaSplatsThree } from '@lumaai/luma-web';
+
+function isChrome() {
+    return /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+}
+
+        
+        
+        // Parameters
+        const parameters = {
+            camera: {
+                minY: -0.8,
+                maxZoomOut: 1000,
+                startPosition: { x: 0, y: 0.8, z: 2.5 },
+            },
+            scene: {
+                origin: { x: 0, y: -1, z: 0 },
+                maxDistanceFromCenter: 8,
+                targetLimit: {
+                    x: 0,
+                    z: 0
+                }
+            },
+            animation: {
+                autoRotate: true,
+                startRadius: 5,
+                speed: 0.003
+            },
+            rebound: {
+                speed: 0.2,
+                elasticity: 0.05
+            }
+        };
+
+if (isChrome()) {
+    parameters.animation.speed *= 0.5;
+}
+
+        
+        
+        let renderer = new WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(new Color(0x000000)); // Renderer clear color set to black
+        renderer.setPixelRatio(window.devicePixelRatio * 0.8);
+        document.body.appendChild(renderer.domElement);
+
+        let scene = new Scene();
+
+        let camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, parameters.camera.maxZoomOut);
+        camera.position.set(parameters.camera.startPosition.x, parameters.camera.startPosition.y, parameters.camera.startPosition.z);
+
+        let controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+
+        let sceneCenter = new Vector3(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
+
+        controls.addEventListener('change', () => {
+            // Restrict camera Y minimum
+            if (camera.position.y < parameters.camera.minY) {
+                camera.position.y += (parameters.camera.minY - camera.position.y) * parameters.rebound.speed;
+            }
+
+            // Restrict target movement on X and Z axes with elastic rebound
+            const clampRebound = (current, min, max) => {
+                let clamped = Math.min(Math.max(current, min), max);
+                return clamped + (current - clamped) * parameters.rebound.elasticity;
+            };
+            controls.target.x = clampRebound(controls.target.x, -parameters.scene.targetLimit.x, parameters.scene.targetLimit.x);
+            controls.target.y = parameters.scene.origin.y; // Set target Y limit
+            controls.target.z = clampRebound(controls.target.z, -parameters.scene.targetLimit.z, parameters.scene.targetLimit.z);
+
+            // Restrict camera distance from the scene center
+            if (camera.position.distanceTo(sceneCenter) > parameters.scene.maxDistanceFromCenter) {
+                let direction = new Vector3().subVectors(camera.position, sceneCenter).normalize();
+                camera.position.copy(direction.multiplyScalar(parameters.scene.maxDistanceFromCenter).add(sceneCenter));
+            }
+        });
+
+        let splat = new LumaSplatsThree({
+            source: 'https://lumalabs.ai/embed/6bc77f9a-5e04-414b-87cf-800c81617815?mode=sparkles&background=%23ffffff&color=%23000000&showTitle=true&loadBg=true&logoPosition=bottom-left&infoPosition=bottom-right&cinematicVideo=undefined&showMenu=false',
+            particleRevealEnabled: true,
+            particleRevealDuration: 3.33 // Speed up by 50%
+        });
+        scene.add(splat);
+
+        // Creating a white dot
+        let dotGeometry = new SphereGeometry(0.03, 32, 32);
+        let dotMaterial = new MeshBasicMaterial({ color: 0xffffff }); // white color
+        let dot = new Mesh(dotGeometry, dotMaterial);
+        dot.position.set(2.1, -1, -1.98); // Position 5 units above the origin
+        scene.add(dot);
+
+// Create canvas for text
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 1054;
+        canvas.height = 512;
+        context.fillStyle = 'rgba(255, 255, 255, 0)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = 'white';
+        context.font = '200px sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        context.lineWidth = 5;
+        context.fillText('Lot 1', canvas.width / 2, canvas.height / 2);
+        context.strokeText('Lot 1', canvas.width / 2, canvas.height / 2);
+
+        // Create texture from canvas
+        const texture = new Texture(canvas);
+        texture.needsUpdate = true;        
+
+
+        // Create plane geometry and mesh
+        const geometry = new PlaneGeometry(0.8, 0.4);
+        const material = new MeshStandardMaterial({
+            map: texture,
+            transparent: false,
+            alphaTest: 0.5,
+            side: DoubleSide,
+            premultipliedAlpha: true,
+            emissive: 'white',
+            emissiveIntensity: 2,
+        });
+        const textPlane = new Mesh(geometry, material);
+
+        textPlane.geometry.translate(0,0.2,0);
+
+        // Position and rotate text plane
+        textPlane.position.set(2.1, -1, -1.98);
+        textPlane.rotation.y = Math.PI / 2;
+        textPlane.scale.setScalar(0.6);
+        scene.add(textPlane);
+        textPlane.geometry.translate(0,-1.7,0);
+
+
+
+
+
+        // Creating a second white dot
+        let dot2 = new Mesh(dotGeometry, dotMaterial);
+        dot2.position.set(1.63, -1, -1.73); // Shift 1 unit on the x-axis
+        scene.add(dot2);
+
+        // Create canvas for second text
+        const canvas2 = document.createElement('canvas');
+        const context2 = canvas2.getContext('2d');
+        canvas2.width = 1024;
+        canvas2.height = 512;
+        context2.fillStyle = 'rgba(255, 255, 255, 0)';
+        context2.fillRect(0, 0, canvas2.width, canvas2.height);
+        context2.fillStyle = 'white';
+        context2.font = '200px sans-serif';
+        context2.textAlign = 'center';
+        context2.textBaseline = 'middle';
+        context2.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        context2.lineWidth = 5;
+        context2.fillText('Lot 2', canvas2.width / 2, canvas2.height / 2);
+        context2.strokeText('Lot 2', canvas2.width / 2, canvas2.height / 2);
+
+        // Create texture from second canvas
+        const texture2 = new Texture(canvas2);
+        texture2.needsUpdate = true;
+
+        // Create plane geometry and mesh for second text
+        const textPlane2 = new Mesh(geometry, material.clone());
+        textPlane2.material.map = texture2;
+        textPlane2.material.needsUpdate = true;
+
+        textPlane2.geometry.translate(0,0.2,0);
+
+        // Position and rotate second text plane
+        textPlane2.position.set(1.63, -1, -1.73); // Shift 1 unit on the x-axis
+        textPlane2.rotation.y = Math.PI / 2;
+        textPlane2.scale.setScalar(0.6);
+        scene.add(textPlane2);
+
+
+
+
+
+// Creating a third white dot
+        let dot3 = new Mesh(dotGeometry, dotMaterial);
+        dot3.position.set(1, -1, -1.5); // Shift 1 unit on the x-axis
+        scene.add(dot3);
+
+        // Create canvas for second text
+        const canvas3 = document.createElement('canvas');
+        const context3 = canvas3.getContext('2d');
+        canvas3.width = 1024;
+        canvas3.height = 512;
+        context3.fillStyle = 'rgba(255, 255, 255, 0)';
+        context3.fillRect(0, 0, canvas3.width, canvas3.height);
+        context3.fillStyle = 'white';
+        context3.font = '200px sans-serif';
+        context3.textAlign = 'center';
+        context3.textBaseline = 'middle';
+        context3.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        context3.lineWidth = 5;
+        context3.fillText('Lot 3', canvas3.width / 2, canvas3.height / 2);
+        context3.strokeText('Lot 3', canvas3.width / 2, canvas3.height / 2);
+
+        // Create texture from second canvas
+        const texture3 = new Texture(canvas3);
+        texture3.needsUpdate = true;
+
+        // Create plane geometry and mesh for second text
+        const textPlane3 = new Mesh(geometry, material.clone());
+        textPlane3.material.map = texture3;
+        textPlane3.material.needsUpdate = true;
+
+        textPlane3.geometry.translate(0,0.05,0);
+
+        // Position and rotate third text plane
+        textPlane3.position.set(1, -1, -1.5); // Shift 1 unit on the x-axis
+        textPlane3.rotation.y = Math.PI / 2;
+        textPlane3.scale.setScalar(0.6);
+        scene.add(textPlane3);
+
+
+
+
+// Creating a fourth white dot
+let dot4 = new Mesh(dotGeometry, dotMaterial);
+dot4.position.set(-0.5, -1, 0); // Shift 1 unit on the x-axis and -0.5 on the z-axis
+scene.add(dot4);
+
+// Create canvas for fourth text
+const canvas4 = document.createElement('canvas');
+const context4 = canvas4.getContext('2d');
+canvas4.width = 1024;
+canvas4.height = 512;
+context4.fillStyle = 'rgba(255, 255, 255, 0)';
+context4.fillRect(0, 0, canvas4.width, canvas4.height);
+context4.fillStyle = 'white';
+context4.font = '200px sans-serif';
+context4.textAlign = 'center';
+context4.textBaseline = 'middle';
+context4.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context4.lineWidth = 5;
+context4.fillText('Lot 4', canvas4.width / 2, canvas4.height / 2);
+context4.strokeText('Lot 4', canvas4.width / 2, canvas4.height / 2);
+
+// Create texture from fourth canvas
+const texture4 = new Texture(canvas4);
+texture4.needsUpdate = true;
+
+// Create plane geometry and mesh for fourth text
+const textPlane4 = new Mesh(geometry, material.clone());
+textPlane4.material.map = texture4;
+textPlane4.material.needsUpdate = true;
+
+textPlane4.geometry.translate(0,0.2,0);
+
+// Position and rotate fourth text plane
+textPlane4.position.set(-0.5, -1, 0); // Shift 1 unit on the x-axis and -0.5 on the z-axis
+textPlane4.rotation.y = Math.PI / 2;
+textPlane4.scale.setScalar(0.6);
+scene.add(textPlane4);
+
+
+// Creating a fifth white dot
+let dot5 = new Mesh(dotGeometry, dotMaterial);
+dot5.position.set(-0.7, -1, 1.4); // Shift 1 unit on the x-axis and -1 on the z-axis
+scene.add(dot5);
+
+// Create canvas for fifth text
+const canvas5 = document.createElement('canvas');
+const context5 = canvas5.getContext('2d');
+canvas5.width = 1024;
+canvas5.height = 512;
+context5.fillStyle = 'rgba(255, 255, 255, 0)';
+context5.fillRect(0, 0, canvas5.width, canvas5.height);
+context5.fillStyle = 'white';
+context5.font = '200px sans-serif';
+context5.textAlign = 'center';
+context5.textBaseline = 'middle';
+context5.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context5.lineWidth = 5;
+context5.fillText('Lot 5', canvas5.width / 2, canvas5.height / 2);
+context5.strokeText('Lot 5', canvas5.width / 2, canvas5.height / 2);
+
+// Create texture from fifth canvas
+const texture5 = new Texture(canvas5);
+texture5.needsUpdate = true;
+
+// Create plane geometry and mesh for fifth text
+const textPlane5 = new Mesh(geometry, material.clone());
+textPlane5.material.map = texture5;
+textPlane5.material.needsUpdate = true;
+
+textPlane5.geometry.translate(0,0.2,0);
+
+// Position and rotate fifth text plane
+textPlane5.position.set(-0.7, -1, 1.4); // Shift 1 unit on the x-axis and -1 on the z-axis
+textPlane5.rotation.y = Math.PI / 2;
+textPlane5.scale.setScalar(0.6);
+scene.add(textPlane5);
+
+
+// Repeat the above process for the next three lots, adjusting the position on the z-axis accordingly.
+
+
+
+
+// Creating a sixth white dot
+let dot6 = new Mesh(dotGeometry, dotMaterial);
+dot6.position.set(-0.17, -1, 1.05); // Shift 1 unit on the x-axis and -1.5 on the z-axis
+scene.add(dot6);
+
+// Create canvas for sixth text
+const canvas6 = document.createElement('canvas');
+const context6 = canvas6.getContext('2d');
+canvas6.width = 1024;
+canvas6.height = 512;
+context6.fillStyle = 'rgba(255, 255, 255, 0)';
+context6.fillRect(0, 0, canvas6.width, canvas6.height);
+context6.fillStyle = 'white';
+context6.font = '200px sans-serif';
+context6.textAlign = 'center';
+context6.textBaseline = 'middle';
+context6.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context6.lineWidth = 5;
+context6.fillText('Lot 6', canvas6.width / 2, canvas6.height / 2);
+context6.strokeText('Lot 6', canvas6.width / 2, canvas6.height / 2);
+
+// Create texture from sixth canvas
+const texture6 = new Texture(canvas6);
+texture6.needsUpdate = true;
+
+// Create plane geometry and mesh for sixth text
+const textPlane6 = new Mesh(geometry, material.clone());
+textPlane6.material.map = texture6;
+textPlane6.material.needsUpdate = true;
+
+textPlane6.geometry.translate(0,0.2,0);
+
+// Position and rotate sixth text plane
+textPlane6.position.set(-0.17, -1, 1.05); // Shift 1 unit on the x-axis and -1.5 on the z-axis
+textPlane6.rotation.y = Math.PI / 2;
+textPlane6.scale.setScalar(0.6);
+scene.add(textPlane6);
+
+
+// Creating a seventh white dot
+let dot7 = new Mesh(dotGeometry, dotMaterial);
+dot7.position.set(0.36, -1, 0.7); // Shift 1 unit on the x-axis and -2 on the z-axis
+scene.add(dot7);
+
+// Create canvas for seventh text
+const canvas7 = document.createElement('canvas');
+const context7 = canvas7.getContext('2d');
+canvas7.width = 1024;
+canvas7.height = 512;
+context7.fillStyle = 'rgba(255, 255, 255, 0)';
+context7.fillRect(0, 0, canvas7.width, canvas7.height);
+context7.fillStyle = 'white';
+context7.font = '200px sans-serif';
+context7.textAlign = 'center';
+context7.textBaseline = 'middle';
+context7.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context7.lineWidth = 5;
+context7.fillText('Lot 7', canvas7.width / 2, canvas7.height / 2);
+context7.strokeText('Lot 7', canvas7.width / 2, canvas7.height / 2);
+
+// Create texture from seventh canvas
+const texture7 = new Texture(canvas7);
+texture7.needsUpdate = true;
+
+// Create plane geometry and mesh for seventh text
+const textPlane7 = new Mesh(geometry, material.clone());
+textPlane7.material.map = texture7;
+textPlane7.material.needsUpdate = true;
+
+textPlane7.geometry.translate(0,0.2,0);
+
+// Position and rotate seventh text plane
+textPlane7.position.set(0.36, -1, 0.7); // Shift 1 unit on the x-axis and -2 on the z-axis
+textPlane7.rotation.y = Math.PI / 2;
+textPlane7.scale.setScalar(0.6);
+scene.add(textPlane7);
+
+
+// Creating an eighth white dot
+let dot8 = new Mesh(dotGeometry, dotMaterial);
+dot8.position.set(0.90, -1, 0.29); // Shift 1 unit on the x-axis and -2.5 on the z-axis
+scene.add(dot8);
+
+// Create canvas for eighth text
+const canvas8 = document.createElement('canvas');
+const context8 = canvas8.getContext('2d');
+canvas8.width = 1024;
+canvas8.height = 512;
+context8.fillStyle = 'rgba(255, 255, 255, 0)';
+context8.fillRect(0, 0, canvas8.width, canvas8.height);
+context8.fillStyle = 'white';
+context8.font = '200px sans-serif';
+context8.textAlign = 'center';
+context8.textBaseline = 'middle';
+context8.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context8.lineWidth = 5;
+context8.fillText('Lot 8', canvas8.width / 2, canvas8.height / 2);
+context8.strokeText('Lot 8', canvas8.width / 2, canvas8.height / 2);
+
+// Create texture from eighth canvas
+const texture8 = new Texture(canvas8);
+texture8.needsUpdate = true;
+
+// Create plane geometry and mesh for eighth text
+const textPlane8 = new Mesh(geometry, material.clone());
+textPlane8.material.map = texture8;
+textPlane8.material.needsUpdate = true;
+
+textPlane8.geometry.translate(0,0.2,0);
+
+// Position and rotate eighth text plane
+textPlane8.position.set(0.90, -1, 0.25); // Shift 1 unit on the x-axis and -2.5 on the z-axis
+textPlane8.rotation.y = Math.PI / 2;
+textPlane8.scale.setScalar(0.6);
+scene.add(textPlane8);
+
+
+
+// Creating a ninth white dot
+let dot9 = new Mesh(dotGeometry, dotMaterial);
+dot9.position.set(1.33, -1, -0.15); // Shift 1 unit on the x-axis and -2.5 on the z-axis
+scene.add(dot9);
+
+
+
+// Create canvas for ninth text
+const canvas9 = document.createElement('canvas');
+const context9 = canvas9.getContext('2d');
+canvas9.width = 1024;
+canvas9.height = 512;
+context9.fillStyle = 'rgba(255, 255, 255, 0)';
+context9.fillRect(0, 0, canvas9.width, canvas9.height);
+context9.fillStyle = 'white';
+context9.font = '200px sans-serif';
+context9.textAlign = 'center';
+context9.textBaseline = 'middle';
+context9.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context9.lineWidth = 5;
+context9.fillText('Lot 9', canvas9.width / 2, canvas9.height / 2);
+context9.strokeText('Lot 9', canvas9.width / 2, canvas9.height / 2);
+
+// Create texture from ninth canvas
+const texture9 = new Texture(canvas9);
+texture9.needsUpdate = true;
+
+// Create plane geometry and mesh for ninth text
+const textPlane9 = new Mesh(geometry, material.clone());
+textPlane9.material.map = texture9;
+textPlane9.material.needsUpdate = true;
+
+textPlane9.geometry.translate(0,0.2,0);
+
+// Position and rotate ninth text plane
+textPlane9.position.set(1.33, -1, -0.15); // Shift 1 unit on the x-axis and -3.0 on the z-axis
+textPlane9.rotation.y = Math.PI / 2;
+textPlane9.scale.setScalar(0.6);
+scene.add(textPlane9);
+
+
+
+
+
+
+
+// Creating a tenth white dot
+let dot10 = new Mesh(dotGeometry, dotMaterial);
+dot10.position.set(0.2, -0.7, 2.1); // Shift 1 unit on the x-axis and -2.5 on the z-axis
+scene.add(dot10);
+
+
+
+// Create canvas for tenth text
+const canvas10 = document.createElement('canvas');
+const context10 = canvas10.getContext('2d');
+canvas10.width = 1024;
+canvas10.height = 512;
+context10.fillStyle = 'rgba(255, 255, 255, 0)';
+context10.fillRect(0, 0, canvas10.width, canvas10.height);
+context10.fillStyle = 'white';
+context10.font = '200px sans-serif';
+context10.textAlign = 'center';
+context10.textBaseline = 'middle';
+context10.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context10.lineWidth = 5;
+context10.fillText('Eden 3.0', canvas10.width / 2, canvas10.height / 2);
+context10.strokeText('Eden 3.0', canvas10.width / 2, canvas10.height / 2);
+
+// Create texture from tenth canvas
+const texture10 = new Texture(canvas10);
+texture10.needsUpdate = true;
+
+// Create plane geometry and mesh for tenth text
+const textPlane10 = new Mesh(geometry, material.clone());
+textPlane10.material.map = texture10;
+textPlane10.material.needsUpdate = true;
+
+textPlane10.geometry.translate(0,0.2,0);
+
+// Position and rotate tenth text plane
+textPlane10.position.set(0.2, -0.7, 2.1); // Shift 1 unit on the x-axis and -3.0 on the z-axis
+textPlane10.rotation.y = Math.PI / 2;
+textPlane10.scale.setScalar(0.6);
+scene.add(textPlane10);
+
+
+
+
+
+
+
+// Creating an eleventh white dot
+let dot11 = new Mesh(dotGeometry, dotMaterial);
+dot11.position.set(1.15, -0.7, 1.8); // Shift 1 unit on the x-axis and -2.5 on the z-axis
+scene.add(dot11);
+
+
+
+// Create canvas for eleventh text
+const canvas11 = document.createElement('canvas');
+const context11 = canvas11.getContext('2d');
+canvas11.width = 1024;
+canvas11.height = 512;
+context11.fillStyle = 'rgba(255, 255, 255, 0)';
+context11.fillRect(0, 0, canvas11.width, canvas11.height);
+context11.fillStyle = 'white';
+context11.font = '200px sans-serif';
+context11.textAlign = 'center';
+context11.textBaseline = 'middle';
+context11.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+context11.lineWidth = 5;
+context11.fillText('Eden 2.0', canvas11.width / 2, canvas11.height / 2);
+context11.strokeText('Eden 2.0', canvas11.width / 2, canvas11.height / 2);
+
+// Create texture from eleventh canvas
+const texture11 = new Texture(canvas11);
+texture11.needsUpdate = true;
+
+// Create plane geometry and mesh for eleventh text
+const textPlane11 = new Mesh(geometry, material.clone());
+textPlane11.material.map = texture11;
+textPlane11.material.needsUpdate = true;
+
+textPlane11.geometry.translate(0,0.2,0);
+
+// Position and rotate eleventh text plane
+textPlane11.position.set(1.15, -0.7, 1.8); // Shift 1 unit on the x-axis and -3.0 on the z-axis
+textPlane11.rotation.y = Math.PI / 2;
+textPlane11.scale.setScalar(0.6);
+scene.add(textPlane11);
+
+
+
+
+
+
+        window.addEventListener('resize', function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }, false);
+
+        let angle = 0;
+        let autoRotate = parameters.animation.autoRotate;
+
+        function animate() {
+            if (autoRotate) {
+                angle += parameters.animation.speed;
+                camera.position.x = Math.sin(angle) * parameters.animation.startRadius;
+                camera.position.z = Math.cos(angle) * parameters.animation.startRadius;
+                camera.lookAt(scene.position); // Ensure the camera always looks at the scene
+            }
+            textPlane.lookAt(camera.position);
+textPlane2.lookAt(camera.position); textPlane3.lookAt(camera.position); textPlane4.lookAt(camera.position); textPlane5.lookAt(camera.position); textPlane6.lookAt(camera.position); textPlane7.lookAt(camera.position); textPlane8.lookAt(camera.position); textPlane9.lookAt(camera.position);
+textPlane10.lookAt(camera.position); textPlane11.lookAt(camera.position);// Update text orientation to always face the camera
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        
+
+controls.addEventListener('start', () => autoRotate = false);
+        window.addEventListener('touchstart', () => autoRotate = false);
+
+        animate();
+    </script>
+    <script>
+
+let targetFPS = 60; // Target FPS for optimal performance
+let currentFPS = 60; // Initially assume 60 FPS for optimal performance
+let maxPixelRatio = 2; // Maximum pixel ratio for high-performance devices
+let smoothedPixelRatio = window.devicePixelRatio; // Initially set to device pixel ratio
+let smoothingFactor = 0.1; // Smoothing factor for adjusting pixel ratio
+
+// Function to measure FPS
+function measureFPS() {
+    // Measure FPS here and update currentFPS variable
+    // This could be done by calculating the time between frames
+    // For simplicity, let's assume currentFPS is updated externally
+}
+
+// Function to adjust pixel ratio based on measured FPS
+function adjustPixelRatio() {
+    let adjustmentFactor = Math.max(0.3, Math.min(1, currentFPS / targetFPS)); // Clamp adjustment factor between 0.3 and 1
+    let newPixelRatio = Math.floor(window.devicePixelRatio * adjustmentFactor);
+    
+    // Smooth the adjustment using exponential smoothing
+    smoothedPixelRatio += (newPixelRatio - smoothedPixelRatio) * smoothingFactor;
+    
+    // Clamp the smoothed pixel ratio to avoid extreme values
+    smoothedPixelRatio = Math.max(1, Math.min(maxPixelRatio, smoothedPixelRatio));
+    
+    renderer.setPixelRatio(smoothedPixelRatio);
+}
+
+// Function to animate the scene
+function animate() {
+    measureFPS(); // Measure FPS before rendering each frame
+    adjustPixelRatio(); // Adjust pixel ratio based on measured FPS
+    // Render your scene here
+    requestAnimationFrame(animate);
+}
+
+    </script>
+
+</body>
+</html>
