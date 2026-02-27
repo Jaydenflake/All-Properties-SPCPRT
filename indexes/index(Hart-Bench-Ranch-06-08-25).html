@@ -121,8 +121,8 @@
         /* Parent Menu (default base values) */
         .menu-container {
             display: flex;
-            width: 105px;
-            height: 59px;
+            width: fit-content;
+            min-height: 59px;
             padding: 7px;
             justify-content: center;
             align-items: flex-start;
@@ -1365,7 +1365,14 @@ Hart Bench Ranch provides a rare opportunity to own a complete yet manageable op
     }
 
     function animate() {
-        if (autoRotate) {
+        const now = performance.now();
+        if (window.__pathAnimation) {
+            if (window.__pathAnimationLastTime == null) window.__pathAnimationLastTime = now;
+            const deltaSec = Math.min((now - window.__pathAnimationLastTime) / 1000, 0.1);
+            window.__pathAnimationLastTime = now;
+            window.__pathAnimation.update(deltaSec);
+        }
+        if (autoRotate && (!window.__pathAnimation || !window.__pathAnimation.getState().playing)) {
         angle += parameters.animation.speed;
         const c = parameters.animation.center;
 
@@ -1460,6 +1467,20 @@ Hart Bench Ranch provides a rare opportunity to own a complete yet manageable op
     if (iconsToLoad.length === 0) {
         animate();
     }
+
+    // Path animation (flight path + editor + recording) - shared module
+    import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
+        const menuContainerEl = document.getElementById('menuContainer');
+        window.__pathAnimation = initPathAnimation({
+            camera,
+            controls,
+            renderer,
+            sceneOrigin: parameters.scene.origin,
+            startPosition: parameters.camera.startPosition,
+            menuContainer: menuContainerEl,
+            propertyLabel: 'Hart-Bench-Ranch'
+        });
+    }).catch(err => console.warn('Path animation failed to load', err));
 
     // Hart Bench Ranch UI JavaScript - Ported with Extreme Care
     
@@ -1640,8 +1661,16 @@ Hart Bench Ranch provides a rare opportunity to own a complete yet manageable op
         }
     });
 
-    // Add click listener for compass button
+    // Add click listener for compass button: restart flight path if available, else animate to north
     compassButton.addEventListener('mouseup', () => {
+        if (window.__pathAnimation) {
+            const state = window.__pathAnimation.getState();
+            const checkpoints = state.pathState && state.pathState.checkpoints ? state.pathState.checkpoints : [];
+            if (checkpoints.length >= 2) {
+                window.__pathAnimation.goToAnimationStart();
+                return;
+            }
+        }
         console.log('Compass clicked - animating to north');
         animateCameraToNorth();
     });

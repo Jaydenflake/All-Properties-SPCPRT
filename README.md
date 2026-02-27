@@ -17,3 +17,13 @@ The date is the source repository's GitHub `created_at` date.
 - `Dolan Road` was sourced from `HansenHomeAI/DolanRoad-CORE`.
 - `Hill Street` was sourced from `HansenHomeAI/Hillst`.
 - The original links provided for those two were incomplete as GitHub repo URLs.
+
+## Flight path (path animation + editor + recording)
+
+A **shared path animation** module adds a Copper-Rock–style flight path, editor UI, and recording to any property index that uses Three.js + OrbitControls:
+
+- **Module**: `shared/path-animation.mjs`
+- **Docs**: `shared/README.md`
+- **Example**: `indexes/index(Hart-Bench-Ranch-06-08-25).html` (Path button top-right, record button in menu)
+
+To add the same to another property index, follow the integration steps in `shared/README.md`.

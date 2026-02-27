@@ -3544,12 +3544,19 @@
     }
 
     function animate(now = performance.now()) {
+        if (window.__pathAnimation) {
+            if (window.__pathAnimationLastTime == null) window.__pathAnimationLastTime = now;
+            const deltaForShared = Math.min((now - window.__pathAnimationLastTime) / 1000, 0.1);
+            window.__pathAnimationLastTime = now;
+            window.__pathAnimation.update(deltaForShared);
+        }
+
         const deltaSeconds = Math.min(Math.max((now - lastAnimationFrameTime) / 1000, 0), 0.1);
         lastAnimationFrameTime = now;
         if (!isAnimatingToNorth) {
             if (pathAnimationState.enabled && pathAnimationState.playing) {
                 updatePathAnimation(deltaSeconds);
-            } else if (autoRotate) {
+            } else if (autoRotate && (!window.__pathAnimation || !window.__pathAnimation.getState().playing)) {
                 angle += parameters.animation.speed;
                 const c = parameters.animation.center;
                 camera.position.x = c.x + Math.sin(angle) * parameters.animation.startRadius;
@@ -3717,6 +3724,20 @@
         if (performance.now() < ignoreNextPauseUntil) return;
         pauseCameraAutomationFromInteraction();
     });
+
+    // Path animation (flight path + editor + recording) - shared module
+    import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
+        const menuContainerEl = document.getElementById('menuContainer');
+        window.__pathAnimation = initPathAnimation({
+            camera,
+            controls,
+            renderer,
+            sceneOrigin: parameters.scene.origin,
+            startPosition: parameters.camera.startPosition,
+            menuContainer: menuContainerEl,
+            propertyLabel: 'Copper-Rock'
+        });
+    }).catch(err => console.warn('Path animation failed to load', err));
 
     let lastPointerDownForTapDot = { x: 0, y: 0 };
     let suppressTapDotClickUntil = 0;
@@ -5316,8 +5337,16 @@
         }
     });
 
-    // Add click listener for compass button (dual purpose: north face OR animation start)
+    // Add click listener for compass button (dual purpose: restart shared path if available, else existing behavior)
     compassButton.addEventListener('click', (event) => {
+        if (window.__pathAnimation) {
+            const state = window.__pathAnimation.getState();
+            const checkpoints = state.pathState && state.pathState.checkpoints ? state.pathState.checkpoints : [];
+            if (checkpoints.length >= 2) {
+                window.__pathAnimation.goToAnimationStart();
+                return;
+            }
+        }
         const mode = (parameters.compass.northButtonMode || 'north').toLowerCase();
         if (mode === 'animationstart') {
             goToAnimationStart();

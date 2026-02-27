@@ -35,10 +35,99 @@
             margin-right: 10px;
             padding: 10px;
         }
+        .menu-container {
+            display: flex;
+            width: fit-content;
+            min-height: 59px;
+            padding: 7px;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 1px;
+            border-radius: 30px;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(128, 128, 128, 0.30);
+            -webkit-backdrop-filter: blur(50px);
+            backdrop-filter: blur(50px);
+            -webkit-transform-origin: left bottom;
+            transform-origin: left bottom;
+            box-sizing: border-box;
+        }
+        .menu-container::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: inherit;
+            background: linear-gradient(145deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 41%, rgba(255,255,255,0) 57%, rgba(255,255,255,0.4) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            padding: 1.4px;
+            pointer-events: none;
+        }
+        .menu-button {
+            width: 45px;
+            height: 45px;
+            position: relative;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 23.5px;
+            cursor: pointer;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+            box-sizing: border-box;
+        }
+        .menu-button img, .menu-button svg {
+            width: 21px;
+            height: 21px;
+            position: relative;
+            z-index: 1;
+            pointer-events: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        @media (hover:hover) {
+            .menu-button:hover::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.15);
+                transform: scale(1);
+                transition: transform 0.3s ease, opacity 0.3s ease;
+                opacity: 1;
+                z-index: 0;
+            }
+        }
+        .menu-button::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            transform: scale(0);
+            opacity: 0;
+            z-index: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        .menu-button.active::before {
+            transform: scale(1);
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
     <div id="vignette"></div>
+    <div class="menu-container" id="menuContainer">
+        <div id="compassButton" class="menu-button">
+            <img id="compassIcon" src="https://raw.githubusercontent.com/HansenHomeAI/FigmaSVGButtons/main/NorthOutline.svg" alt="Compass" draggable="false">
+        </div>
+    </div>
     <div id="overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; color: white; font-size: 24px; font-family: Arial, sans-serif;">Lot #1</div>
 
     <!-- Developer mode controls -->
@@ -56,7 +145,7 @@
     }
     </script>
     <script type="module">
-    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4 } from 'three';
+    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane } from 'three';
 
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { LumaSplatsThree } from '@lumaai/luma-web';
@@ -484,7 +573,7 @@
     }
 
     // ***** ONLY THIS FUNCTION CHANGED TO REMOVE LENGTH-WISE ROLL *****
-    function createBorderLineBetweenDots(dot1, dot2) {
+    function createBorderLineBetweenDots(dot1, dot2, startName, endName) {
         const start = dot1.position;
         const end = dot2.position;
         const direction = new Vector3().subVectors(end, start);
@@ -497,6 +586,7 @@
         const boxGeometry = new BoxGeometry(length, boxHeight, boxThickness);
         const boxMaterial = new MeshBasicMaterial({ color: borderDotParams.color, transparent: true, opacity: 0 });
         const box = new Mesh(boxGeometry, boxMaterial);
+        box.userData = { startName, endName };
 
         // We define the local X axis as the direction of the line
         // and then fix the local Y/Z using a stable 'up' vector so we don't roll.
@@ -557,11 +647,486 @@
         const dot1 = borderDots[connection.start];
         const dot2 = borderDots[connection.end];
         if (dot1 && dot2) {
-            const borderLine = createBorderLineBetweenDots(dot1, dot2);
+            const borderLine = createBorderLineBetweenDots(dot1, dot2, connection.start, connection.end);
             borderLines.push(borderLine);
         }
     });
     requestAnimationFrame(fadeInBorders);
+
+    function updateBorderLineMesh(lineMesh, dot1, dot2) {
+        if (!lineMesh || !dot1 || !dot2) return;
+        const start = dot1.position;
+        const end = dot2.position;
+        const direction = new Vector3().subVectors(end, start);
+        const length = Math.max(1e-8, direction.length());
+        const midPoint = new Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+        const boxThickness = borderDotParams.radius * 2;
+        const boxHeight = 0.002;
+        if (lineMesh.geometry) lineMesh.geometry.dispose();
+        lineMesh.geometry = new BoxGeometry(length, boxHeight, boxThickness);
+
+        let x = direction.clone().normalize();
+        let up = new Vector3(0, 1, 0);
+        if (Math.abs(x.dot(up)) > 0.9999) {
+            up = new Vector3(0, 0, 1);
+        }
+        let z = new Vector3().crossVectors(x, up).normalize();
+        let y = new Vector3().crossVectors(z, x).normalize();
+        const rotMatrix = new Matrix4();
+        rotMatrix.makeBasis(x, y, z);
+        const translationMatrix = new Matrix4().makeTranslation(midPoint.x, midPoint.y, midPoint.z);
+        lineMesh.matrixAutoUpdate = false;
+        lineMesh.matrix.identity();
+        lineMesh.matrix.multiplyMatrices(translationMatrix, rotMatrix);
+    }
+
+    const borderEditState = {
+        active: false,
+        selectedName: null,
+        dragging: false,
+        dragPointerId: null,
+        dragPlane: new Plane(new Vector3(0, 1, 0), 0),
+        raycaster: new Raycaster(),
+        ndc: { x: 0, y: 0 },
+        ui: {
+            wrap: null,
+            toggle: null,
+            panel: null,
+            status: null,
+            selected: null,
+            x: null,
+            y: null,
+            z: null
+        },
+        original: {
+            dotColor: new Map(),
+            dotOpacity: new Map(),
+            dotScale: new Map(),
+            lineOpacity: new Map()
+        }
+    };
+
+    function ensureBorderEditorStyles() {
+        if (document.getElementById('wolf-border-editor-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'wolf-border-editor-styles';
+        style.textContent = `
+            .wolf-border-editor-toggle {
+                width: 44px;
+                height: 44px;
+                padding: 0;
+                border-radius: 50%;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                background: rgba(0, 0, 0, 0.35);
+                color: rgba(255, 255, 255, 0.9);
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s ease, border-color 0.2s ease;
+            }
+            .wolf-border-editor-toggle:hover {
+                background: rgba(255, 255, 255, 0.1);
+                border-color: rgba(255, 255, 255, 0.35);
+            }
+            .wolf-border-editor-toggle.active {
+                background: rgba(191, 40, 27, 0.45);
+                border-color: rgba(191, 40, 27, 0.5);
+                color: #fff;
+            }
+            .wolf-border-editor-toggle svg { width: 22px; height: 22px; }
+            .wolf-border-editor-panel {
+                position: absolute;
+                right: 12px;
+                top: 118px;
+                width: 260px;
+                max-width: min(260px, calc(100vw - 24px));
+                z-index: 12;
+                border-radius: 20px;
+                background: rgba(32, 32, 32, 0.5);
+                -webkit-backdrop-filter: blur(45px);
+                backdrop-filter: blur(45px);
+                color: rgba(255, 255, 255, 0.95);
+                font-family: 'Helvetica Neue', Arial, sans-serif;
+                padding: 14px 14px 12px;
+                box-sizing: border-box;
+                opacity: 0;
+                transform: translateY(8px) scale(0.98);
+                pointer-events: none;
+                transition: opacity 0.2s ease, transform 0.2s ease;
+            }
+            .wolf-border-editor-panel.active {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                pointer-events: auto;
+            }
+            .wolf-border-editor-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
+                margin-bottom: 6px;
+            }
+            .wolf-border-editor-title {
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 0.2px;
+            }
+            .wolf-border-editor-close {
+                width: 24px;
+                min-width: 24px;
+                height: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                background: rgba(0, 0, 0, 0.3);
+                color: rgba(255, 255, 255, 0.9);
+                font: 500 14px/1 sans-serif;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                padding: 0;
+            }
+            .wolf-border-editor-status {
+                font-size: 10px;
+                color: rgba(255, 255, 255, 0.7);
+                margin-bottom: 8px;
+                line-height: 1.3;
+                min-height: 26px;
+            }
+            .wolf-border-editor-selected {
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.9);
+                margin-bottom: 10px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .wolf-border-editor-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 8px;
+            }
+            .wolf-border-editor-field label {
+                display: block;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.74);
+                margin-bottom: 5px;
+            }
+            .wolf-border-editor-field input {
+                width: 100%;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                border-radius: 10px;
+                background: rgba(0, 0, 0, 0.32);
+                color: #fff;
+                font: 500 12px/1 'Helvetica Neue', Arial, sans-serif;
+                padding: 8px 8px;
+                box-sizing: border-box;
+                outline: none;
+            }
+            .wolf-border-editor-actions {
+                margin-top: 10px;
+                display: flex;
+                gap: 8px;
+            }
+            .wolf-border-editor-actions button {
+                flex: 1;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                border-radius: 10px;
+                background: rgba(0, 0, 0, 0.34);
+                color: #fff;
+                font: 600 12px/1 'Helvetica Neue', Arial, sans-serif;
+                padding: 10px 10px;
+                cursor: pointer;
+            }
+            .wolf-border-editor-actions button:hover {
+                border-color: rgba(255, 255, 255, 0.38);
+                background: rgba(191, 40, 27, 0.38);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function getOrCreateTopRightToolbarWrap() {
+        const existing = document.getElementById('pathAnimationEditorTogglesWrap') || document.getElementById('wolfTopRightToolbarWrap');
+        if (existing) return existing;
+        const wrap = document.createElement('div');
+        wrap.id = 'wolfTopRightToolbarWrap';
+        wrap.style.position = 'absolute';
+        wrap.style.top = '12px';
+        wrap.style.right = '12px';
+        wrap.style.zIndex = '12';
+        wrap.style.display = 'flex';
+        wrap.style.gap = '8px';
+        wrap.style.alignItems = 'center';
+        document.body.appendChild(wrap);
+        return wrap;
+    }
+
+    function setBorderEditorActive(active) {
+        borderEditState.active = !!active;
+        if (borderEditState.ui.toggle) borderEditState.ui.toggle.classList.toggle('active', borderEditState.active);
+        if (borderEditState.ui.panel) borderEditState.ui.panel.classList.toggle('active', borderEditState.active);
+        if (!borderEditState.active) {
+            borderEditState.dragging = false;
+            borderEditState.dragPointerId = null;
+            controls.enabled = true;
+            setSelectedBorderDot(null);
+            restoreBorderVisuals();
+            setBorderStatus('Edit mode off.');
+        } else {
+            applyEditModeVisuals();
+            setBorderStatus('Edit mode on. Click a border dot to select, then drag to move.');
+        }
+    }
+
+    function setBorderStatus(message) {
+        if (borderEditState.ui.status) borderEditState.ui.status.textContent = message || '';
+    }
+
+    function applyEditModeVisuals() {
+        Object.entries(borderDots).forEach(([name, mesh]) => {
+            if (!borderEditState.original.dotColor.has(name)) borderEditState.original.dotColor.set(name, mesh.material.color.getHex());
+            if (!borderEditState.original.dotOpacity.has(name)) borderEditState.original.dotOpacity.set(name, mesh.material.opacity);
+            if (!borderEditState.original.dotScale.has(name)) borderEditState.original.dotScale.set(name, mesh.scale.x);
+            mesh.material.opacity = 1;
+            mesh.scale.setScalar(borderEditState.original.dotScale.get(name) * 2.25);
+            mesh.scale.y = 0.22;
+        });
+        borderLines.forEach((lineMesh, idx) => {
+            if (!borderEditState.original.lineOpacity.has(idx)) borderEditState.original.lineOpacity.set(idx, lineMesh.material.opacity);
+            lineMesh.material.opacity = 1;
+        });
+    }
+
+    function restoreBorderVisuals() {
+        Object.entries(borderDots).forEach(([name, mesh]) => {
+            const c = borderEditState.original.dotColor.get(name);
+            if (c !== undefined) mesh.material.color.setHex(c);
+            const o = borderEditState.original.dotOpacity.get(name);
+            if (o !== undefined) mesh.material.opacity = o;
+            const s = borderEditState.original.dotScale.get(name);
+            if (s !== undefined) {
+                mesh.scale.setScalar(s);
+                mesh.scale.y = 0.1;
+            }
+        });
+        borderLines.forEach((lineMesh, idx) => {
+            const o = borderEditState.original.lineOpacity.get(idx);
+            if (o !== undefined) lineMesh.material.opacity = o;
+        });
+    }
+
+    function setSelectedBorderDot(name) {
+        borderEditState.selectedName = name;
+        if (!name) {
+            if (borderEditState.ui.selected) borderEditState.ui.selected.textContent = 'Vertex: none';
+            if (borderEditState.ui.x) borderEditState.ui.x.value = '';
+            if (borderEditState.ui.y) borderEditState.ui.y.value = '';
+            if (borderEditState.ui.z) borderEditState.ui.z.value = '';
+            Object.entries(borderDots).forEach(([n, mesh]) => {
+                const c = borderEditState.original.dotColor.get(n);
+                if (c !== undefined) mesh.material.color.setHex(c);
+            });
+            return;
+        }
+        const mesh = borderDots[name];
+        if (!mesh) return;
+        Object.entries(borderDots).forEach(([n, dotMesh]) => {
+            const c = borderEditState.original.dotColor.get(n);
+            if (c !== undefined) dotMesh.material.color.setHex(c);
+        });
+        mesh.material.color.setHex(0xff3b30);
+        if (borderEditState.ui.selected) borderEditState.ui.selected.textContent = `Vertex: ${name}`;
+        syncBorderInputsFromSelection();
+    }
+
+    function syncBorderInputsFromSelection() {
+        const name = borderEditState.selectedName;
+        if (!name) return;
+        const mesh = borderDots[name];
+        if (!mesh) return;
+        if (borderEditState.ui.x) borderEditState.ui.x.value = mesh.position.x.toFixed(3);
+        if (borderEditState.ui.y) borderEditState.ui.y.value = mesh.position.y.toFixed(3);
+        if (borderEditState.ui.z) borderEditState.ui.z.value = mesh.position.z.toFixed(3);
+    }
+
+    function applyBorderInputsToSelection() {
+        const name = borderEditState.selectedName;
+        if (!name) return;
+        const mesh = borderDots[name];
+        if (!mesh) return;
+        const x = parseFloat(borderEditState.ui.x?.value);
+        const y = parseFloat(borderEditState.ui.y?.value);
+        const z = parseFloat(borderEditState.ui.z?.value);
+        if (Number.isFinite(x)) mesh.position.x = x;
+        if (Number.isFinite(y)) mesh.position.y = y;
+        if (Number.isFinite(z)) mesh.position.z = z;
+        updateConnectedBorderLines(name);
+        setBorderStatus(`Updated ${name}.`);
+    }
+
+    function updateConnectedBorderLines(dotName) {
+        borderLines.forEach((lineMesh) => {
+            const startName = lineMesh.userData?.startName;
+            const endName = lineMesh.userData?.endName;
+            if (startName !== dotName && endName !== dotName) return;
+            const dot1 = borderDots[startName];
+            const dot2 = borderDots[endName];
+            updateBorderLineMesh(lineMesh, dot1, dot2);
+        });
+    }
+
+    function updateNdcFromEvent(event) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / rect.width;
+        const y = (event.clientY - rect.top) / rect.height;
+        borderEditState.ndc.x = x * 2 - 1;
+        borderEditState.ndc.y = -(y * 2 - 1);
+    }
+
+    function pickBorderDot(event) {
+        updateNdcFromEvent(event);
+        borderEditState.raycaster.setFromCamera(borderEditState.ndc, camera);
+        const dotMeshes = Object.values(borderDots);
+        const hits = borderEditState.raycaster.intersectObjects(dotMeshes, false);
+        if (!hits || !hits.length) return null;
+        const hit = hits[0].object;
+        return Object.entries(borderDots).find(([, mesh]) => mesh === hit)?.[0] || null;
+    }
+
+    function initBorderEditorUI() {
+        ensureBorderEditorStyles();
+        const wrap = getOrCreateTopRightToolbarWrap();
+        borderEditState.ui.wrap = wrap;
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'wolf-border-editor-toggle';
+        toggle.id = 'wolfBorderEditorToggle';
+        toggle.setAttribute('aria-label', 'Edit border');
+        toggle.setAttribute('title', 'Edit border');
+        toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+        wrap.appendChild(toggle);
+        borderEditState.ui.toggle = toggle;
+
+        const panel = document.createElement('div');
+        panel.className = 'wolf-border-editor-panel';
+        panel.id = 'wolfBorderEditorPanel';
+        panel.innerHTML = `
+            <div class="wolf-border-editor-header">
+                <div class="wolf-border-editor-title">Border</div>
+                <button type="button" class="wolf-border-editor-close" aria-label="Close">×</button>
+            </div>
+            <div class="wolf-border-editor-status" id="wolfBorderEditorStatus"></div>
+            <div class="wolf-border-editor-selected" id="wolfBorderEditorSelected">Vertex: none</div>
+            <div class="wolf-border-editor-grid">
+                <div class="wolf-border-editor-field">
+                    <label for="wolfBorderX">X</label>
+                    <input id="wolfBorderX" type="number" step="0.001">
+                </div>
+                <div class="wolf-border-editor-field">
+                    <label for="wolfBorderY">Y</label>
+                    <input id="wolfBorderY" type="number" step="0.001">
+                </div>
+                <div class="wolf-border-editor-field">
+                    <label for="wolfBorderZ">Z</label>
+                    <input id="wolfBorderZ" type="number" step="0.001">
+                </div>
+            </div>
+            <div class="wolf-border-editor-actions">
+                <button type="button" id="wolfBorderCopyBtn">Copy JSON</button>
+                <button type="button" id="wolfBorderApplyBtn">Apply</button>
+            </div>
+        `;
+        document.body.appendChild(panel);
+        borderEditState.ui.panel = panel;
+        borderEditState.ui.status = document.getElementById('wolfBorderEditorStatus');
+        borderEditState.ui.selected = document.getElementById('wolfBorderEditorSelected');
+        borderEditState.ui.x = document.getElementById('wolfBorderX');
+        borderEditState.ui.y = document.getElementById('wolfBorderY');
+        borderEditState.ui.z = document.getElementById('wolfBorderZ');
+
+        panel.querySelector('.wolf-border-editor-close').addEventListener('click', () => setBorderEditorActive(false));
+        toggle.addEventListener('click', () => setBorderEditorActive(!borderEditState.active));
+
+        document.getElementById('wolfBorderApplyBtn').addEventListener('click', () => applyBorderInputsToSelection());
+        document.getElementById('wolfBorderCopyBtn').addEventListener('click', async () => {
+            const payload = borderDotPositions.map((entry) => {
+                const mesh = borderDots[entry.name];
+                if (!mesh) return entry;
+                return {
+                    name: entry.name,
+                    position: {
+                        x: +mesh.position.x.toFixed(6),
+                        y: +mesh.position.y.toFixed(6),
+                        z: +mesh.position.z.toFixed(6)
+                    }
+                };
+            });
+            try {
+                await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+                setBorderStatus('Copied borderDotPositions JSON to clipboard.');
+            } catch (err) {
+                setBorderStatus('Copy failed (clipboard permission).');
+            }
+        });
+
+        setBorderStatus('Edit mode off.');
+    }
+
+    initBorderEditorUI();
+
+    function handleBorderPointerDown(event) {
+        if (!borderEditState.active) return;
+        const pickedName = pickBorderDot(event);
+        if (!pickedName) return;
+        setSelectedBorderDot(pickedName);
+        borderEditState.dragging = true;
+        borderEditState.dragPointerId = event.pointerId;
+        controls.enabled = false;
+        const dotY = borderDots[pickedName].position.y;
+        borderEditState.dragPlane.set(new Vector3(0, 1, 0), -dotY);
+        renderer.domElement.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    }
+
+    function handleBorderPointerMove(event) {
+        if (!borderEditState.active) return;
+        if (!borderEditState.dragging) return;
+        if (borderEditState.dragPointerId !== event.pointerId) return;
+        const name = borderEditState.selectedName;
+        if (!name) return;
+        const mesh = borderDots[name];
+        if (!mesh) return;
+        updateNdcFromEvent(event);
+        borderEditState.raycaster.setFromCamera(borderEditState.ndc, camera);
+        const hit = new Vector3();
+        const ok = borderEditState.raycaster.ray.intersectPlane(borderEditState.dragPlane, hit);
+        if (!ok) return;
+        mesh.position.x = hit.x;
+        mesh.position.z = hit.z;
+        updateConnectedBorderLines(name);
+        syncBorderInputsFromSelection();
+        event.preventDefault();
+    }
+
+    function handleBorderPointerUp(event) {
+        if (!borderEditState.active) return;
+        if (!borderEditState.dragging) return;
+        if (borderEditState.dragPointerId !== event.pointerId) return;
+        borderEditState.dragging = false;
+        borderEditState.dragPointerId = null;
+        controls.enabled = true;
+        try { renderer.domElement.releasePointerCapture(event.pointerId); } catch (e) {}
+        setBorderStatus(borderEditState.selectedName ? `Moved ${borderEditState.selectedName}.` : 'Edit mode on.');
+    }
+
+    renderer.domElement.addEventListener('pointerdown', handleBorderPointerDown, { passive: false });
+    window.addEventListener('pointermove', handleBorderPointerMove, { passive: false });
+    window.addEventListener('pointerup', handleBorderPointerUp, { passive: true });
+    window.addEventListener('pointercancel', handleBorderPointerUp, { passive: true });
 
     function createHotspot(hotspotConfig, index, totalHotspots) {
         const { text, position, scale } = hotspotConfig;
@@ -623,8 +1188,15 @@
         : 0;
     let autoRotate = parameters.animation.autoRotate;
 
-    function animate() {
-        if (autoRotate) {
+    function animate(now = performance.now()) {
+        if (window.__pathAnimation) {
+            if (window.__pathAnimationLastTime == null) window.__pathAnimationLastTime = now;
+            const deltaSeconds = Math.min((now - window.__pathAnimationLastTime) / 1000, 0.1);
+            window.__pathAnimationLastTime = now;
+            window.__pathAnimation.update(deltaSeconds);
+        }
+
+        if (autoRotate && (!window.__pathAnimation || !window.__pathAnimation.getState().playing)) {
             angle += parameters.animation.speed;
             camera.position.x = Math.sin(angle) * parameters.animation.startRadius;
             camera.position.z = Math.cos(angle) * parameters.animation.startRadius;
@@ -652,6 +1224,7 @@
     window.addEventListener('touchstart', () => autoRotate = false);
 
     window.addEventListener('click', (event) => {
+        if (borderEditState.active) return;
         const x = event.clientX;
         const y = event.clientY;
         renderHiddenCanvas();
@@ -697,6 +1270,35 @@
             console.log('No TapDot detected');
         }
     });
+
+    // Path animation (flight path + editor + recording) - shared module
+    import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
+        const menuContainerEl = document.getElementById('menuContainer');
+        window.__pathAnimation = initPathAnimation({
+            camera,
+            controls,
+            renderer,
+            sceneOrigin: parameters.scene.origin,
+            startPosition: parameters.camera.startPosition,
+            menuContainer: menuContainerEl,
+            propertyLabel: 'Wolf-Creek'
+        });
+    }).catch(err => console.warn('Path animation failed to load', err));
+
+    // Compass button: restart flight path if available
+    const compassButton = document.getElementById('compassButton');
+    if (compassButton) {
+        compassButton.addEventListener('mouseup', () => {
+            if (window.__pathAnimation) {
+                const state = window.__pathAnimation.getState();
+                const checkpoints = state.pathState && state.pathState.checkpoints ? state.pathState.checkpoints : [];
+                if (checkpoints.length >= 2) {
+                    window.__pathAnimation.goToAnimationStart();
+                    return;
+                }
+            }
+        });
+    }
     </script>
 </body>
 </html>

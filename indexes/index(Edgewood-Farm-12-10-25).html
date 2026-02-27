@@ -312,8 +312,8 @@
         /* Parent Menu (default base values) */
         .menu-container {
             display: flex;
-            width: 105px;
-            height: 59px;
+            width: fit-content;
+            min-height: 59px;
             padding: 7px;
             justify-content: center;
             align-items: flex-start;
@@ -1925,17 +1925,24 @@
         }
     }
 
-    function animate() {
-        if (autoRotate) {
-        angle += parameters.animation.speed;
-        const c = parameters.animation.center;
+    function animate(now = performance.now()) {
+        if (window.__pathAnimation) {
+            if (window.__pathAnimationLastTime == null) window.__pathAnimationLastTime = now;
+            const deltaSeconds = Math.min((now - window.__pathAnimationLastTime) / 1000, 0.1);
+            window.__pathAnimationLastTime = now;
+            window.__pathAnimation.update(deltaSeconds);
+        }
 
-        camera.position.x = c.x + Math.sin(angle) * parameters.animation.startRadius;
-        camera.position.z = c.z + Math.cos(angle) * parameters.animation.startRadius;
-        camera.position.y = c.y + parameters.camera.startPosition.y;
+        if (autoRotate && (!window.__pathAnimation || !window.__pathAnimation.getState().playing)) {
+            angle += parameters.animation.speed;
+            const c = parameters.animation.center;
 
-        camera.lookAt(controls.target);
-    }
+            camera.position.x = c.x + Math.sin(angle) * parameters.animation.startRadius;
+            camera.position.z = c.z + Math.cos(angle) * parameters.animation.startRadius;
+            camera.position.y = c.y + parameters.camera.startPosition.y;
+
+            camera.lookAt(controls.target);
+        }
 
         // Make normal hotspot text always face the camera
         hotspots.forEach(hotspot => {
@@ -2015,6 +2022,20 @@
             console.log('No TapDot detected');
         }
     });
+
+    // Path animation (flight path + editor + recording) - shared module
+    import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
+        const menuContainerEl = document.getElementById('menuContainer');
+        window.__pathAnimation = initPathAnimation({
+            camera,
+            controls,
+            renderer,
+            sceneOrigin: parameters.scene.origin,
+            startPosition: parameters.camera.startPosition,
+            menuContainer: menuContainerEl,
+            propertyLabel: 'Edgewood-Farm'
+        });
+    }).catch(err => console.warn('Path animation failed to load', err));
 
     // Start animation once icons are loaded
     // (If no icons, we simply call animate() immediately)
@@ -2201,8 +2222,16 @@
         }
     });
 
-    // Add click listener for compass button
+    // Add click listener for compass button: restart flight path if available, else animate to north
     compassButton.addEventListener('mouseup', () => {
+        if (window.__pathAnimation) {
+            const state = window.__pathAnimation.getState();
+            const checkpoints = state.pathState && state.pathState.checkpoints ? state.pathState.checkpoints : [];
+            if (checkpoints.length >= 2) {
+                window.__pathAnimation.goToAnimationStart();
+                return;
+            }
+        }
         console.log('Compass clicked - animating to north');
         animateCameraToNorth();
     });
