@@ -267,7 +267,170 @@ export function initPathAnimation(options = {}) {
     syncUI();
   }
 
-  function recordPathAnimation(durationMs = 20000, fps = 30, onBefore, onAfter) {
+  const recordFormats = [
+    { id: 'desktop', label: 'Desktop', ratio: 'Current', width: 0, height: 0, iconW: 36, iconH: 22 },
+    { id: 'square', label: 'Square', ratio: '1:1', width: 1080, height: 1080, iconW: 26, iconH: 26 },
+    { id: 'vertical-feed', label: 'Vertical Feed', ratio: '4:5', width: 1080, height: 1350, iconW: 24, iconH: 30 },
+    { id: 'full-vertical', label: 'Full Vertical', ratio: '9:16', width: 1080, height: 1920, iconW: 20, iconH: 34 }
+  ];
+
+  let activeCanvasFormat = null;
+
+  function showFormatPicker(onSelect) {
+    const overlay = document.createElement('div');
+    overlay.className = 'record-format-overlay';
+    overlay.innerHTML = `
+      <div class="record-format-dialog">
+        <div class="record-format-dialog-title">Recording Format</div>
+        <div class="record-format-grid">
+          ${recordFormats.map((f) => `
+            <button type="button" class="record-format-btn" data-format-id="${f.id}">
+              <div class="record-format-btn-icon" style="width:${f.iconW}px;height:${f.iconH}px;"></div>
+              <div class="record-format-btn-label">${f.label}</div>
+              <div class="record-format-btn-size">${f.ratio}${f.width ? ' ' + f.width + 'x' + f.height : ''}</div>
+            </button>
+          `).join('')}
+        </div>
+        <div class="record-format-duration-row">
+          <label for="recordFormatDuration">Duration</label>
+          <input id="recordFormatDuration" type="number" min="5" max="120" step="5" value="20">
+          <span>seconds</span>
+        </div>
+        <button type="button" class="record-format-cancel">Cancel</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    function dismiss() {
+      overlay.classList.remove('active');
+      setTimeout(() => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 200);
+    }
+
+    overlay.querySelector('.record-format-cancel').addEventListener('click', dismiss);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+
+    overlay.querySelectorAll('.record-format-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const formatId = btn.getAttribute('data-format-id');
+        const format = recordFormats.find((f) => f.id === formatId);
+        const durInput = overlay.querySelector('#recordFormatDuration');
+        const durationSec = Math.max(5, Math.min(120, parseFloat(durInput.value) || 20));
+        dismiss();
+        if (format && typeof onSelect === 'function') {
+          onSelect(format, durationSec * 1000);
+        }
+      });
+    });
+  }
+
+  function showCanvasFormatPicker() {
+    const overlay = document.createElement('div');
+    overlay.className = 'record-format-overlay';
+    const currentId = activeCanvasFormat ? activeCanvasFormat.id : 'desktop';
+    overlay.innerHTML = `
+      <div class="record-format-dialog">
+        <div class="record-format-dialog-title">Canvas Format</div>
+        <div class="record-format-grid">
+          ${recordFormats.map((f) => `
+            <button type="button" class="record-format-btn${f.id === currentId ? ' active-format' : ''}" data-format-id="${f.id}">
+              <div class="record-format-btn-icon" style="width:${f.iconW}px;height:${f.iconH}px;"></div>
+              <div class="record-format-btn-label">${f.label}</div>
+              <div class="record-format-btn-size">${f.ratio}</div>
+            </button>
+          `).join('')}
+        </div>
+        <button type="button" class="record-format-cancel">Cancel</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    function dismiss() {
+      overlay.classList.remove('active');
+      setTimeout(() => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 200);
+    }
+
+    overlay.querySelector('.record-format-cancel').addEventListener('click', dismiss);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+
+    overlay.querySelectorAll('.record-format-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const formatId = btn.getAttribute('data-format-id');
+        const format = recordFormats.find((f) => f.id === formatId);
+        dismiss();
+        if (format) applyCanvasFormat(format);
+      });
+    });
+  }
+
+  function getCanvasFormatOffset() {
+    if (!activeCanvasFormat) return { x: 0, y: 0 };
+    const aspect = activeCanvasFormat.width / activeCanvasFormat.height;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let cw, ch;
+    if (vw / vh > aspect) { ch = vh; cw = Math.round(vh * aspect); }
+    else { cw = vw; ch = Math.round(vw / aspect); }
+    return { x: (vw - cw) / 2, y: (vh - ch) / 2 };
+  }
+
+  function adjustUIForCanvasFormat() {
+    if (!menuContainer || !activeCanvasFormat) return;
+    const { x, y } = getCanvasFormatOffset();
+    if (x === 0 && y === 0) return;
+    const curBottom = parseFloat(menuContainer.style.bottom) || 0;
+    const curLeft = parseFloat(menuContainer.style.left) || 0;
+    menuContainer.style.bottom = (curBottom + y) + 'px';
+    menuContainer.style.left = (curLeft + x) + 'px';
+  }
+
+  function applyCanvasFormat(format) {
+    const canvas = renderer.domElement;
+    if (!format || format.id === 'desktop') {
+      activeCanvasFormat = null;
+      canvas.style.position = '';
+      canvas.style.left = '';
+      canvas.style.top = '';
+      canvas.style.transform = '';
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      document.body.classList.remove('canvas-format-active');
+      window.dispatchEvent(new Event('resize'));
+      return;
+    }
+    activeCanvasFormat = format;
+    const aspect = format.width / format.height;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let w, h;
+    if (vw / vh > aspect) {
+      h = vh;
+      w = Math.round(vh * aspect);
+    } else {
+      w = vw;
+      h = Math.round(vw / aspect);
+    }
+    renderer.setSize(w, h);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    canvas.style.position = 'absolute';
+    canvas.style.left = '50%';
+    canvas.style.top = '50%';
+    canvas.style.transform = 'translate(-50%, -50%)';
+    document.body.classList.add('canvas-format-active');
+    requestAnimationFrame(() => adjustUIForCanvasFormat());
+  }
+
+  window.addEventListener('resize', () => {
+    if (activeCanvasFormat) {
+      applyCanvasFormat(activeCanvasFormat);
+    }
+  });
+
+  function recordPathAnimation(opts = {}) {
+    const { durationMs = 20000, fps = 30, formatWidth = 0, formatHeight = 0, formatLabel = '', onBefore, onAfter } = opts;
     if (typeof MediaRecorder === 'undefined') {
       console.warn('MediaRecorder is not supported.');
       return;
@@ -277,9 +440,26 @@ export function initPathAnimation(options = {}) {
       return;
     }
     if (typeof onBefore === 'function') onBefore();
+
+    const canvas = renderer.domElement;
+    const origWidth = canvas.width;
+    const origHeight = canvas.height;
+    const origStyleW = canvas.style.width;
+    const origStyleH = canvas.style.height;
+    const origAspect = camera.aspect;
+    const origPixelRatio = renderer.getPixelRatio();
+    const needsResize = formatWidth > 0 && formatHeight > 0;
+
+    if (needsResize) {
+      renderer.setPixelRatio(1);
+      renderer.setSize(formatWidth, formatHeight);
+      camera.aspect = formatWidth / formatHeight;
+      camera.updateProjectionMatrix();
+    }
+
     if (!pathState.enabled) pathState.enabled = true;
     goToAnimationStart();
-    const canvas = renderer.domElement;
+
     const stream = canvas.captureStream(fps);
     const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
     let mimeType = '';
@@ -291,20 +471,35 @@ export function initPathAnimation(options = {}) {
     const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     const chunks = [];
     recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+
+    function restoreSize() {
+      if (needsResize) {
+        renderer.setPixelRatio(origPixelRatio);
+        renderer.setSize(origWidth / origPixelRatio, origHeight / origPixelRatio);
+        canvas.style.width = origStyleW;
+        canvas.style.height = origStyleH;
+        camera.aspect = origAspect;
+        camera.updateProjectionMatrix();
+      }
+    }
+
     recorder.onstop = () => {
+      restoreSize();
       const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const sec = Math.round(durationMs / 1000);
       const label = String(propertyLabel).replace(/\s+/g, '-');
+      const fmtTag = formatLabel ? '-' + formatLabel : '';
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       a.href = url;
-      a.download = `path-${label}-${sec}s-${ts}.webm`;
+      a.download = `path-${label}${fmtTag}-${sec}s-${ts}.webm`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
       if (typeof onAfter === 'function') onAfter();
     };
+
     recorder.start();
     setTimeout(() => {
       recorder.stop();
@@ -574,9 +769,13 @@ export function initPathAnimation(options = {}) {
       #pathAnimationRecordButton { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.35); color: #fff; cursor: pointer; }
       #pathAnimationRecordButton:hover { background: rgba(191,40,27,0.4); }
       #pathAnimationRecordButton svg { width: 21px; height: 21px; }
+      #canvasFormatButton { color: #fff; }
+      #canvasFormatButton svg { width: 21px; height: 21px; }
+      .record-format-btn.active-format { background: rgba(191,40,27,0.35); border-color: rgba(191,40,27,0.5); }
       body.recording-mode .path-animation-editor-toggles-wrap,
       body.recording-mode .path-animation-editor-panel,
       body.recording-mode #pathAnimationRecordButton,
+      body.recording-mode #canvasFormatButton,
       body.recording-mode .menu-container,
       body.recording-mode #detailsBox,
       body.recording-mode #overlay-ui,
@@ -592,6 +791,62 @@ export function initPathAnimation(options = {}) {
       body.recording-mode .lot-editor-panel,
       body.recording-mode #compassButton,
       body.recording-mode #hansenLogo { visibility: hidden !important; pointer-events: none !important; }
+
+      .record-format-overlay {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0,0,0,0.6);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.2s ease;
+      }
+      .record-format-overlay.active { opacity: 1; }
+      .record-format-dialog {
+        width: 340px; max-width: calc(100vw - 32px);
+        border-radius: 20px;
+        background: rgba(32,32,32,0.85);
+        -webkit-backdrop-filter: blur(45px); backdrop-filter: blur(45px);
+        color: rgba(255,255,255,0.95);
+        font-family: 'Helvetica Neue',Arial,sans-serif;
+        padding: 20px; box-sizing: border-box;
+        transform: translateY(12px) scale(0.96);
+        transition: transform 0.2s ease;
+      }
+      .record-format-overlay.active .record-format-dialog { transform: translateY(0) scale(1); }
+      .record-format-dialog-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; text-align: center; }
+      .record-format-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+      .record-format-btn {
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        padding: 12px 8px; border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 14px; background: rgba(0,0,0,0.3);
+        color: #fff; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      }
+      .record-format-btn:hover { background: rgba(191,40,27,0.35); border-color: rgba(191,40,27,0.5); }
+      .record-format-btn-icon {
+        border: 1.5px solid rgba(255,255,255,0.5); border-radius: 3px;
+        background: rgba(255,255,255,0.08);
+      }
+      .record-format-btn-label { font-size: 12px; font-weight: 600; }
+      .record-format-btn-size { font-size: 10px; color: rgba(255,255,255,0.55); }
+      .record-format-duration-row {
+        display: flex; align-items: center; gap: 10px;
+        margin-bottom: 14px; justify-content: center;
+      }
+      .record-format-duration-row label { font-size: 12px; color: rgba(255,255,255,0.75); }
+      .record-format-duration-row input {
+        width: 72px; padding: 6px 8px;
+        border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+        background: rgba(0,0,0,0.35); color: #fff;
+        font: 500 12px/1 'Helvetica Neue',Arial,sans-serif; text-align: center;
+      }
+      .record-format-duration-row span { font-size: 11px; color: rgba(255,255,255,0.5); }
+      .record-format-cancel {
+        display: block; width: 100%; padding: 10px;
+        border: 1px solid rgba(255,255,255,0.15); border-radius: 12px;
+        background: rgba(0,0,0,0.25); color: rgba(255,255,255,0.7);
+        font: 500 13px/1 'Helvetica Neue',Arial,sans-serif;
+        cursor: pointer; text-align: center; transition: background 0.15s;
+      }
+      .record-format-cancel:hover { background: rgba(255,255,255,0.08); }
     `;
     document.head.appendChild(style);
   }
@@ -767,15 +1022,34 @@ export function initPathAnimation(options = {}) {
       recordBtnEl = document.createElement('div');
       recordBtnEl.id = 'pathAnimationRecordButton';
       recordBtnEl.className = 'menu-button';
-      recordBtnEl.setAttribute('title', 'Record 20s of path animation');
-      recordBtnEl.setAttribute('aria-label', 'Record 20 seconds of path animation');
+      recordBtnEl.setAttribute('title', 'Record path animation');
+      recordBtnEl.setAttribute('aria-label', 'Record path animation');
       recordBtnEl.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>';
       recordBtnEl.addEventListener('click', () => {
         if (document.body.classList.contains('recording-mode')) return;
-        document.body.classList.add('recording-mode');
-        recordPathAnimation(20000, 30, () => {}, () => document.body.classList.remove('recording-mode'));
+        showFormatPicker((format, durationMs) => {
+          document.body.classList.add('recording-mode');
+          recordPathAnimation({
+            durationMs,
+            fps: 30,
+            formatWidth: format.width,
+            formatHeight: format.height,
+            formatLabel: format.id === 'desktop' ? '' : format.id,
+            onBefore: () => {},
+            onAfter: () => document.body.classList.remove('recording-mode')
+          });
+        });
       });
       menuContainer.appendChild(recordBtnEl);
+
+      const canvasFormatBtn = document.createElement('div');
+      canvasFormatBtn.id = 'canvasFormatButton';
+      canvasFormatBtn.className = 'menu-button';
+      canvasFormatBtn.setAttribute('title', 'Canvas format');
+      canvasFormatBtn.setAttribute('aria-label', 'Change canvas format');
+      canvasFormatBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7V2h5M17 2h5v5M22 17v5h-5M7 22H2v-5"/></svg>';
+      canvasFormatBtn.addEventListener('click', showCanvasFormatPicker);
+      menuContainer.appendChild(canvasFormatBtn);
     }
 
     setPathEnabled(pathState.enabled);
@@ -792,6 +1066,8 @@ export function initPathAnimation(options = {}) {
     },
     goToAnimationStart,
     getSerializedPayload,
-    recordPathAnimation
+    recordPathAnimation,
+    applyCanvasFormat,
+    showCanvasFormatPicker
   };
 }

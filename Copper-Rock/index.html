@@ -320,6 +320,15 @@
         #recordButton svg {
             color: #e74c3c;
         }
+        #canvasFormatButton {
+            color: #fff;
+            margin-right: 10px;
+        }
+        #canvasFormatButton svg {
+            width: 21px;
+            height: 21px;
+        }
+        .record-format-btn.active-format { background: rgba(191,40,27,0.35); border-color: rgba(191,40,27,0.5); }
 
         .hole-carousel {
             flex: 0 0 149px;  /* long part of golden ratio (61.8% of 241px) */
@@ -1425,6 +1434,7 @@
 
         /* Hide all UI during recording for clean capture */
         body.recording-mode .menu-container,
+        body.recording-mode #canvasFormatButton,
         body.recording-mode #detailsBox,
         body.recording-mode #overlay-ui,
         body.recording-mode #tapdot-labels-layer,
@@ -1435,6 +1445,63 @@
         body.recording-mode .tapdot-popup {
             visibility: hidden !important;
             pointer-events: none !important;
+        }
+
+        .record-format-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.6);
+            -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.2s ease;
+        }
+        .record-format-overlay.active { opacity: 1; }
+        .record-format-dialog {
+            width: 340px; max-width: calc(100vw - 32px);
+            border-radius: 20px;
+            background: rgba(32,32,32,0.85);
+            -webkit-backdrop-filter: blur(45px); backdrop-filter: blur(45px);
+            color: rgba(255,255,255,0.95);
+            font-family: 'Helvetica Neue',Arial,sans-serif;
+            padding: 20px; box-sizing: border-box;
+            transform: translateY(12px) scale(0.96);
+            transition: transform 0.2s ease;
+        }
+        .record-format-overlay.active .record-format-dialog { transform: translateY(0) scale(1); }
+        .record-format-dialog-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; text-align: center; }
+        .record-format-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+        .record-format-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            padding: 12px 8px; border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 14px; background: rgba(0,0,0,0.3);
+            color: #fff; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+        }
+        .record-format-btn:hover { background: rgba(191,40,27,0.35); border-color: rgba(191,40,27,0.5); }
+        .record-format-btn-icon {
+            border: 1.5px solid rgba(255,255,255,0.5); border-radius: 3px;
+            background: rgba(255,255,255,0.08);
+        }
+        .record-format-btn-label { font-size: 12px; font-weight: 600; }
+        .record-format-btn-size { font-size: 10px; color: rgba(255,255,255,0.55); }
+        .record-format-duration-row {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 14px; justify-content: center;
+        }
+        .record-format-duration-row label { font-size: 12px; color: rgba(255,255,255,0.75); }
+        .record-format-duration-row input {
+            width: 72px; padding: 6px 8px;
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+            background: rgba(0,0,0,0.35); color: #fff;
+            font: 500 12px/1 'Helvetica Neue',Arial,sans-serif; text-align: center;
+        }
+        .record-format-duration-row span { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .record-format-cancel {
+            display: block; width: 100%; padding: 10px;
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 12px;
+            background: rgba(0,0,0,0.25); color: rgba(255,255,255,0.7);
+            font: 500 13px/1 'Helvetica Neue',Arial,sans-serif;
+            cursor: pointer; text-align: center; transition: background 0.15s;
+        }
+        .record-format-cancel:hover { background: rgba(255,255,255,0.08); }
         }
     </style>
 </head>
@@ -1463,6 +1530,9 @@
         </div>
         <div id="recordButton" class="menu-button" title="Record 20s of path animation">
             <svg viewBox="0 0 24 24" fill="currentColor" width="21" height="21" aria-hidden="true"><circle cx="12" cy="12" r="6"/></svg>
+        </div>
+        <div id="canvasFormatButton" class="menu-button" title="Canvas format">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="21" height="21" aria-hidden="true"><path d="M2 7V2h5M17 2h5v5M22 17v5h-5M7 22H2v-5"/></svg>
         </div>
         <div id="holeCarousel" class="hole-carousel" role="group" aria-label="Hole selector">
             <button id="holePrevButton" class="hole-nav-button" type="button" aria-label="Previous hole">
@@ -5267,6 +5337,23 @@
             innerPaddingLeftRight = basePaddingLeftRight - 15;
         }
 
+        if (crActiveCanvasFormat) {
+            const cfAspect = crActiveCanvasFormat.width / crActiveCanvasFormat.height;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            let cw, ch;
+            if (vw / vh > cfAspect) { ch = vh; cw = Math.round(vh * cfAspect); }
+            else { cw = vw; ch = Math.round(vw / cfAspect); }
+            const offsetX = (vw - cw) / 2;
+            const offsetY = (vh - ch) / 2;
+            menuLeft += offsetX;
+            menuBottom += offsetY;
+            detailsLeft += offsetX;
+            detailsRight += offsetX;
+            detailsTop += offsetY;
+            detailsBottom += offsetY;
+        }
+
         menuContainer.style.bottom = menuBottom + 'px';
         menuContainer.style.left = menuLeft + 'px';
 
@@ -5610,9 +5697,67 @@
     // Helper: record the first N ms of the camera path to a WebM file.
     // Usage from console: recordPathAnimation20s({ durationMs: 20000, fps: 30 })
     // Options: onBeforeRecord, onAfterRecord (callbacks for UI hide/restore)
+    const crRecordFormats = [
+        { id: 'desktop', label: 'Desktop', ratio: 'Current', width: 0, height: 0, iconW: 36, iconH: 22 },
+        { id: 'square', label: 'Square', ratio: '1:1', width: 1080, height: 1080, iconW: 26, iconH: 26 },
+        { id: 'vertical-feed', label: 'Vertical Feed', ratio: '4:5', width: 1080, height: 1350, iconW: 24, iconH: 30 },
+        { id: 'full-vertical', label: 'Full Vertical', ratio: '9:16', width: 1080, height: 1920, iconW: 20, iconH: 34 }
+    ];
+
+    function showCRFormatPicker(onSelect) {
+        const overlay = document.createElement('div');
+        overlay.className = 'record-format-overlay';
+        overlay.innerHTML = `
+          <div class="record-format-dialog">
+            <div class="record-format-dialog-title">Recording Format</div>
+            <div class="record-format-grid">
+              ${crRecordFormats.map((f) => `
+                <button type="button" class="record-format-btn" data-format-id="${f.id}">
+                  <div class="record-format-btn-icon" style="width:${f.iconW}px;height:${f.iconH}px;"></div>
+                  <div class="record-format-btn-label">${f.label}</div>
+                  <div class="record-format-btn-size">${f.ratio}${f.width ? ' ' + f.width + 'x' + f.height : ''}</div>
+                </button>
+              `).join('')}
+            </div>
+            <div class="record-format-duration-row">
+              <label for="crRecordFormatDuration">Duration</label>
+              <input id="crRecordFormatDuration" type="number" min="5" max="120" step="5" value="20">
+              <span>seconds</span>
+            </div>
+            <button type="button" class="record-format-cancel">Cancel</button>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('active'));
+
+        function dismiss() {
+            overlay.classList.remove('active');
+            setTimeout(() => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 200);
+        }
+
+        overlay.querySelector('.record-format-cancel').addEventListener('click', dismiss);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+
+        overlay.querySelectorAll('.record-format-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const formatId = btn.getAttribute('data-format-id');
+                const format = crRecordFormats.find((f) => f.id === formatId);
+                const durInput = overlay.querySelector('#crRecordFormatDuration');
+                const durationSec = Math.max(5, Math.min(120, parseFloat(durInput.value) || 20));
+                dismiss();
+                if (format && typeof onSelect === 'function') {
+                    onSelect(format, durationSec * 1000);
+                }
+            });
+        });
+    }
+
     window.recordPathAnimation20s = function (options = {}) {
         const durationMs = options.durationMs || 20000;
         const fps = options.fps || 30;
+        const formatWidth = options.formatWidth || 0;
+        const formatHeight = options.formatHeight || 0;
+        const formatLabel = options.formatLabel || '';
         const onBeforeRecord = options.onBeforeRecord;
         const onAfterRecord = options.onAfterRecord;
 
@@ -5633,6 +5778,22 @@
             onBeforeRecord();
         }
 
+        const canvas = renderer.domElement;
+        const origWidth = canvas.width;
+        const origHeight = canvas.height;
+        const origStyleW = canvas.style.width;
+        const origStyleH = canvas.style.height;
+        const origAspect = camera.aspect;
+        const origPixelRatio = renderer.getPixelRatio();
+        const needsResize = formatWidth > 0 && formatHeight > 0;
+
+        if (needsResize) {
+            renderer.setPixelRatio(1);
+            renderer.setSize(formatWidth, formatHeight);
+            camera.aspect = formatWidth / formatHeight;
+            camera.updateProjectionMatrix();
+        }
+
         if (!pathAnimationState.enabled && typeof setPathAnimationEnabled === 'function') {
             setPathAnimationEnabled(true);
         } else {
@@ -5641,7 +5802,6 @@
 
         goToAnimationStart();
 
-        const canvas = renderer.domElement;
         const stream = canvas.captureStream(fps);
 
         const preferredTypes = [
@@ -5670,15 +5830,28 @@
             }
         };
 
+        function restoreSize() {
+            if (needsResize) {
+                renderer.setPixelRatio(origPixelRatio);
+                renderer.setSize(origWidth / origPixelRatio, origHeight / origPixelRatio);
+                canvas.style.width = origStyleW;
+                canvas.style.height = origStyleH;
+                camera.aspect = origAspect;
+                camera.updateProjectionMatrix();
+            }
+        }
+
         recorder.onstop = () => {
+            restoreSize();
             const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             const seconds = Math.round(durationMs / 1000);
             const holeLabel = (getActiveHoleConfig && getActiveHoleConfig()) ? (getActiveHoleConfig().label || '').replace(/\s+/g, '-') : 'hole';
+            const fmtTag = formatLabel ? '-' + formatLabel : '';
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             a.href = url;
-            a.download = `copper-rock-${holeLabel}-${seconds}s-${timestamp}.webm`;
+            a.download = `copper-rock-${holeLabel}${fmtTag}-${seconds}s-${timestamp}.webm`;
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {
@@ -5706,23 +5879,117 @@
 
     const recordButton = document.getElementById('recordButton');
     if (recordButton) {
-        recordButton.setAttribute('aria-label', 'Record 20 seconds of path animation');
+        recordButton.setAttribute('aria-label', 'Record path animation');
         recordButton.addEventListener('click', () => {
             if (document.body.classList.contains('recording-mode')) return;
             if (isDetailsOpen && typeof closeDetails === 'function') {
                 closeDetails();
             }
-            document.body.classList.add('recording-mode');
-            recordPathAnimation20s({
-                durationMs: 20000,
-                fps: 30,
-                onBeforeRecord: () => {},
-                onAfterRecord: () => {
-                    document.body.classList.remove('recording-mode');
-                }
+            showCRFormatPicker((format, durationMs) => {
+                document.body.classList.add('recording-mode');
+                recordPathAnimation20s({
+                    durationMs,
+                    fps: 30,
+                    formatWidth: format.width,
+                    formatHeight: format.height,
+                    formatLabel: format.id === 'desktop' ? '' : format.id,
+                    onBeforeRecord: () => {},
+                    onAfterRecord: () => {
+                        document.body.classList.remove('recording-mode');
+                    }
+                });
             });
         });
     }
+
+    let crActiveCanvasFormat = null;
+
+    function showCRCanvasFormatPicker() {
+        const overlay = document.createElement('div');
+        overlay.className = 'record-format-overlay';
+        const currentId = crActiveCanvasFormat ? crActiveCanvasFormat.id : 'desktop';
+        overlay.innerHTML = `
+          <div class="record-format-dialog">
+            <div class="record-format-dialog-title">Canvas Format</div>
+            <div class="record-format-grid">
+              ${crRecordFormats.map((f) => `
+                <button type="button" class="record-format-btn${f.id === currentId ? ' active-format' : ''}" data-format-id="${f.id}">
+                  <div class="record-format-btn-icon" style="width:${f.iconW}px;height:${f.iconH}px;"></div>
+                  <div class="record-format-btn-label">${f.label}</div>
+                  <div class="record-format-btn-size">${f.ratio}</div>
+                </button>
+              `).join('')}
+            </div>
+            <button type="button" class="record-format-cancel">Cancel</button>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('active'));
+
+        function dismiss() {
+            overlay.classList.remove('active');
+            setTimeout(() => { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 200);
+        }
+
+        overlay.querySelector('.record-format-cancel').addEventListener('click', dismiss);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+
+        overlay.querySelectorAll('.record-format-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const formatId = btn.getAttribute('data-format-id');
+                const format = crRecordFormats.find((f) => f.id === formatId);
+                dismiss();
+                if (format) applyCRCanvasFormat(format);
+            });
+        });
+    }
+
+    function applyCRCanvasFormat(format) {
+        const canvas = renderer.domElement;
+        if (!format || format.id === 'desktop') {
+            crActiveCanvasFormat = null;
+            canvas.style.position = '';
+            canvas.style.left = '';
+            canvas.style.top = '';
+            canvas.style.transform = '';
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            document.body.classList.remove('canvas-format-active');
+            applyLayoutMode();
+            return;
+        }
+        crActiveCanvasFormat = format;
+        const aspect = format.width / format.height;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        let w, h;
+        if (vw / vh > aspect) {
+            h = vh;
+            w = Math.round(vh * aspect);
+        } else {
+            w = vw;
+            h = Math.round(vw / aspect);
+        }
+        renderer.setSize(w, h);
+        camera.aspect = aspect;
+        camera.updateProjectionMatrix();
+        canvas.style.position = 'absolute';
+        canvas.style.left = '50%';
+        canvas.style.top = '50%';
+        canvas.style.transform = 'translate(-50%, -50%)';
+        document.body.classList.add('canvas-format-active');
+        applyLayoutMode();
+    }
+
+    const canvasFormatButton = document.getElementById('canvasFormatButton');
+    if (canvasFormatButton) {
+        canvasFormatButton.addEventListener('click', showCRCanvasFormatPicker);
+    }
+
+    window.addEventListener('resize', () => {
+        if (crActiveCanvasFormat) applyCRCanvasFormat(crActiveCanvasFormat);
+    });
 
     // Apply layout mode on load and on resize
     window.addEventListener('resize', applyLayoutMode);
