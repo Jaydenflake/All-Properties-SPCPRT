@@ -1160,6 +1160,13 @@
         .lot-editor-toggle-wrap {
             margin: 0;
         }
+        .ply-export-toggle-wrap {
+            margin: 0;
+        }
+        .ply-export-radius-row input[type="range"] {
+            width: 100%;
+            margin-top: 4px;
+        }
         .editor-toggles-wrap .lot-editor-toggle-wrap {
             position: static;
             right: auto;
@@ -1338,6 +1345,11 @@
             </svg>
         </button>
     </div>
+    <div class="ply-export-toggle-wrap" id="plyExportToggleWrap">
+        <button id="plyExportToggle" class="lot-editor-toggle animation-editor-toggle-icon-only" type="button" aria-pressed="false" aria-label="Toggle PLY export" title="Export point cloud (tap center, set radius, export PLY)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+    </div>
     </div>
 
     <div id="splatEditorPanel" class="lot-editor-panel animation-editor-panel splat-editor-panel" aria-live="polite">
@@ -1407,6 +1419,50 @@
     </div>
     <div id="lotMidpointLayer" class="lot-midpoint-layer"></div>
 
+    <div id="plyExportPanel" class="lot-editor-panel animation-editor-panel ply-export-panel" aria-live="polite">
+        <div class="animation-editor-header">
+            <div class="lot-editor-title">PLY Export</div>
+            <button id="plyExportCloseButton" class="animation-editor-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div id="plyExportStatus" class="lot-editor-status">Tap on the scene to set center point.</div>
+        <div class="lot-editor-grid">
+            <div class="lot-editor-field">
+                <label for="plyCenterX">Center X</label>
+                <input id="plyCenterX" type="number" step="0.001" readonly placeholder="—">
+            </div>
+            <div class="lot-editor-field">
+                <label for="plyCenterY">Center Y</label>
+                <input id="plyCenterY" type="number" step="0.001" readonly placeholder="—">
+            </div>
+            <div class="lot-editor-field">
+                <label for="plyCenterZ">Center Z</label>
+                <input id="plyCenterZ" type="number" step="0.001" readonly placeholder="—">
+            </div>
+        </div>
+        <div class="lot-editor-field ply-export-radius-row">
+            <label for="plyRadiusSlider">Radius (m): <span id="plyRadiusValue">5</span></label>
+            <input id="plyRadiusSlider" type="range" min="0.1" max="100" value="5" step="0.1">
+        </div>
+        <div class="lot-editor-field ply-export-radius-row">
+            <label for="heightmapResolution">Heightmap size:</label>
+            <select id="heightmapResolution">
+                <option value="512">512 × 512</option>
+                <option value="1024" selected>1024 × 1024</option>
+                <option value="2048">2048 × 2048</option>
+                <option value="4096">4096 × 4096</option>
+            </select>
+        </div>
+        <div class="lot-editor-field">
+            <label><input type="checkbox" id="heightmapFillHoles" aria-label="Fill holes with nearest neighbor"> Fill holes (nearest neighbor)</label>
+        </div>
+        <div class="lot-editor-actions">
+            <button id="plyExportButton" type="button" class="lot-editor-action-btn" disabled>Export PLY</button>
+            <button id="heightmap16ExportButton" type="button" class="lot-editor-action-btn" disabled>Export heightmap (16-bit)</button>
+            <button id="heightmap8ExportButton" type="button" class="lot-editor-action-btn" disabled>Export heightmap (8-bit PNG)</button>
+            <button id="normalMapExportButton" type="button" class="lot-editor-action-btn" disabled>Export Normal Map</button>
+        </div>
+    </div>
+
     <!-- TapDot popup: photo carousel (tap left/right to navigate), caption at bottom -->
     <div id="tapdotPopup" class="tapdot-popup">
         <button type="button" class="tapdot-popup-close" id="tapdotPopupClose" aria-label="Close">
@@ -1475,11 +1531,11 @@
     }
     </script>
     <script type="module">
-    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector2, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane } from 'three';
+    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector2, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane, WireframeGeometry, LineSegments } from 'three';
 
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { LumaSplatsThree } from '@lumaai/luma-web';
-    import { sampleCpuPointsForFocus, findClosestSampleToRay, computeScreenDistancePx } from '../Copper-Rock/tap-focus-refinement.mjs';
+    import { sampleCpuPointsForFocus, findClosestSampleToRay, computeScreenDistancePx, extractPointsInSphere, buildPlyAscii, rasterizePointsToHeightmap, deriveNormalMapFromHeightmap } from '../Copper-Rock/tap-focus-refinement.mjs';
 
     function isChrome() {
         return /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
@@ -3347,7 +3403,7 @@
         if (lotEditState.active) return;
         if (window.isTapdotPopupOpen || isDetailsOpen) return;
         const eventTarget = event.target;
-        if (eventTarget && eventTarget.closest && eventTarget.closest('#overlay-ui, .tapdot-popup, .details-box, .menu-container, .lot-editor-toggle-wrap, .lot-editor-panel, .lot-midpoint-plus, .editor-toggles-wrap, .animation-editor-panel, .splat-editor-panel')) return;
+        if (eventTarget && eventTarget.closest && eventTarget.closest('#overlay-ui, .tapdot-popup, .details-box, .menu-container, .lot-editor-toggle-wrap, .lot-editor-panel, .lot-midpoint-plus, .editor-toggles-wrap, .animation-editor-panel, .splat-editor-panel, .ply-export-panel')) return;
         const dx = event.clientX - lastPointerDownForTapDot.x;
         const dy = event.clientY - lastPointerDownForTapDot.y;
         if (Math.sqrt(dx * dx + dy * dy) > tapDotClickMoveThreshold) return;
@@ -3407,14 +3463,27 @@
     window.addEventListener('click', (event) => {
         if (performance.now() < suppressTapDotClickUntil) return;
         const handledTapDot = handleTapDotActivation(event);
-        if (!handledTapDot && wasTapAtSameSpot(event) && isClickOn3DScene(event)) focusCameraOnTappedPoint(event);
+        if (handledTapDot) return;
+        if (plyExportState.open && wasTapAtSameSpot(event) && isClickOn3DScene(event)) {
+            const picked = pickWorldPointFromTap(event);
+            if (picked) setPlyExportCenter(picked);
+            return;
+        }
+        if (wasTapAtSameSpot(event) && isClickOn3DScene(event)) focusCameraOnTappedPoint(event);
     });
 
     window.addEventListener('pointerup', (event) => {
         if (!event.isPrimary) return;
         if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
         const handledTapDot = handleTapDotActivation(event);
-        const focused = handledTapDot ? false : (wasTapAtSameSpot(event) && isClickOn3DScene(event) && focusCameraOnTappedPoint(event));
+        let focused = false;
+        if (!handledTapDot && plyExportState.open && wasTapAtSameSpot(event) && isClickOn3DScene(event)) {
+            const picked = pickWorldPointFromTap(event);
+            if (picked) setPlyExportCenter(picked);
+            suppressTapDotClickUntil = performance.now() + 700;
+        } else if (!handledTapDot && wasTapAtSameSpot(event) && isClickOn3DScene(event)) {
+            focused = focusCameraOnTappedPoint(event);
+        }
         if (handledTapDot || focused) suppressTapDotClickUntil = performance.now() + 700;
     }, { passive: true });
 
@@ -3491,6 +3560,13 @@
         open: false
     };
 
+    const plyExportState = {
+        open: false,
+        center: null,
+        radius: 5,
+        sphereMesh: null
+    };
+
     const editorTogglesWrap = document.getElementById('editorTogglesWrap');
     if (editorTogglesWrap) {
         editorTogglesWrap.style.display = parameters.developerToolsVisible ? 'flex' : 'none';
@@ -3531,6 +3607,323 @@
         splatEditorToggle.classList.toggle('active', splatEditorState.open);
         splatEditorToggle.setAttribute('aria-pressed', splatEditorState.open ? 'true' : 'false');
         if (splatEditorState.open) syncSplatEditorFromConfig();
+    }
+
+    function setPlyExportOpen(open) {
+        plyExportState.open = !!open;
+        const panel = document.getElementById('plyExportPanel');
+        const toggle = document.getElementById('plyExportToggle');
+        if (panel) panel.classList.toggle('active', plyExportState.open);
+        if (toggle) {
+            toggle.classList.toggle('active', plyExportState.open);
+            toggle.setAttribute('aria-pressed', plyExportState.open ? 'true' : 'false');
+        }
+        if (!plyExportState.open && plyExportState.sphereMesh) {
+            scene.remove(plyExportState.sphereMesh);
+            plyExportState.sphereMesh = null;
+        } else if (plyExportState.open) {
+            updatePlyExportSphere();
+            syncPlyExportUI();
+        }
+    }
+
+    function setPlyExportCenter(worldPoint) {
+        if (!worldPoint) return;
+        plyExportState.center = { x: worldPoint.x, y: worldPoint.y, z: worldPoint.z };
+        updatePlyExportSphere();
+        syncPlyExportUI();
+    }
+
+    function updatePlyExportSphere() {
+        const r = plyExportState.radius;
+        const c = plyExportState.center;
+        if (plyExportState.sphereMesh) {
+            scene.remove(plyExportState.sphereMesh);
+            plyExportState.sphereMesh = null;
+        }
+        if (!c) return;
+        const geo = new SphereGeometry(r, 24, 24);
+        const wireframe = new WireframeGeometry(geo);
+        const mat = new MeshBasicMaterial({ color: 0x00ff88 });
+        const mesh = new LineSegments(wireframe, mat);
+        mesh.position.set(c.x, c.y, c.z);
+        mesh.renderOrder = 1000;
+        scene.add(mesh);
+        plyExportState.sphereMesh = mesh;
+    }
+
+    function syncPlyExportUI() {
+        const status = document.getElementById('plyExportStatus');
+        const centerX = document.getElementById('plyCenterX');
+        const centerY = document.getElementById('plyCenterY');
+        const centerZ = document.getElementById('plyCenterZ');
+        const radiusValue = document.getElementById('plyRadiusValue');
+        const radiusSlider = document.getElementById('plyRadiusSlider');
+        const exportBtn = document.getElementById('plyExportButton');
+        const c = plyExportState.center;
+        if (radiusValue) radiusValue.textContent = plyExportState.radius;
+        if (radiusSlider) radiusSlider.value = plyExportState.radius;
+        if (c) {
+            if (centerX) centerX.value = c.x.toFixed(4);
+            if (centerY) centerY.value = c.y.toFixed(4);
+            if (centerZ) centerZ.value = c.z.toFixed(4);
+            if (exportBtn) exportBtn.disabled = false;
+            if (status) status.textContent = 'Center set. Adjust radius, then Export PLY.';
+            const hm16 = document.getElementById('heightmap16ExportButton');
+            const hm8 = document.getElementById('heightmap8ExportButton');
+            const hmNorm = document.getElementById('normalMapExportButton');
+            if (hm16) hm16.disabled = false;
+            if (hm8) hm8.disabled = false;
+            if (hmNorm) hmNorm.disabled = false;
+        } else {
+            if (centerX) centerX.value = '';
+            if (centerY) centerY.value = '';
+            if (centerZ) centerZ.value = '';
+            if (exportBtn) exportBtn.disabled = true;
+            if (status) status.textContent = 'Tap on the scene to set center point.';
+            const hm16 = document.getElementById('heightmap16ExportButton');
+            const hm8 = document.getElementById('heightmap8ExportButton');
+            const hmNorm = document.getElementById('normalMapExportButton');
+            if (hm16) hm16.disabled = true;
+            if (hm8) hm8.disabled = true;
+            if (hmNorm) hmNorm.disabled = true;
+        }
+    }
+
+    function exportPlyToFile() {
+        const holeSplat = getActiveHoleSplatForTapFocus();
+        if (!holeSplat || !holeSplat.lumaSplatsWebGL || !holeSplat.lumaSplatsWebGL.loader) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Splat not ready. Wait for load.';
+            return;
+        }
+        const c = plyExportState.center;
+        if (!c) return;
+        const loader = holeSplat.lumaSplatsWebGL.loader;
+        const cpuPoints = loader.cpuPoints;
+        const pointCount = Number.isFinite(loader.cpuPtsCount) ? loader.cpuPtsCount : (loader.numSplats ? Math.floor(loader.numSplats) : undefined);
+        holeSplat.updateMatrixWorld(true);
+        const result = extractPointsInSphere({
+            cpuPoints,
+            pointCount,
+            center: c,
+            radius: plyExportState.radius,
+            matrixWorldElements: holeSplat.matrixWorld.elements
+        });
+        if (!result || result.count === 0) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'No points in selection. Try larger radius.';
+            return;
+        }
+        const plyText = buildPlyAscii(result.points, { heightColors: true });
+        const blob = new Blob([plyText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'splat-export.ply';
+        a.click();
+        URL.revokeObjectURL(url);
+        const status = document.getElementById('plyExportStatus');
+        if (status) status.textContent = `Exported ${result.count} points.`;
+    }
+
+    function exportHeightmap16() {
+        const holeSplat = getActiveHoleSplatForTapFocus();
+        if (!holeSplat || !holeSplat.lumaSplatsWebGL || !holeSplat.lumaSplatsWebGL.loader) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Splat not ready. Wait for load.';
+            return;
+        }
+        const c = plyExportState.center;
+        if (!c) return;
+        const loader = holeSplat.lumaSplatsWebGL.loader;
+        const cpuPoints = loader.cpuPoints;
+        const pointCount = Number.isFinite(loader.cpuPtsCount) ? loader.cpuPtsCount : (loader.numSplats ? Math.floor(loader.numSplats) : undefined);
+        holeSplat.updateMatrixWorld(true);
+        const result = extractPointsInSphere({
+            cpuPoints,
+            pointCount,
+            center: c,
+            radius: plyExportState.radius,
+            matrixWorldElements: holeSplat.matrixWorld.elements
+        });
+        if (!result || result.count === 0) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'No points in selection. Try larger radius.';
+            return;
+        }
+        const resEl = document.getElementById('heightmapResolution');
+        const res = Math.max(1, Math.min(4096, parseInt(resEl?.value || '1024', 10) || 1024));
+        const fillHoles = document.getElementById('heightmapFillHoles')?.checked === true;
+        const raster = rasterizePointsToHeightmap(result.points, res, res, {
+            centerX: c.x,
+            centerZ: c.z,
+            radius: plyExportState.radius,
+            fillHoles
+        });
+        if (!raster) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Heightmap rasterization failed.';
+            return;
+        }
+        const rawBytes = new Uint8Array(raster.data.length * 2);
+        for (let i = 0; i < raster.data.length; i++) {
+            const v = raster.data[i];
+            rawBytes[i * 2] = (v >> 8) & 0xff;
+            rawBytes[i * 2 + 1] = v & 0xff;
+        }
+        const rawBlob = new Blob([rawBytes], { type: 'application/octet-stream' });
+        const rawUrl = URL.createObjectURL(rawBlob);
+        const rawA = document.createElement('a');
+        rawA.href = rawUrl;
+        rawA.download = 'elevation.raw';
+        rawA.click();
+        URL.revokeObjectURL(rawUrl);
+        const meta = {
+            width: raster.width,
+            height: raster.height,
+            center: [c.x, c.z],
+            radius_m: plyExportState.radius,
+            minZ: raster.minY,
+            maxZ: raster.maxY,
+            worldUp: 'Z',
+            units: 'meters',
+            noDataValue: 0
+        };
+        const jsonBlob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' });
+        const jsonUrl = URL.createObjectURL(jsonBlob);
+        const jsonA = document.createElement('a');
+        jsonA.href = jsonUrl;
+        jsonA.download = 'elevation.json';
+        jsonA.click();
+        URL.revokeObjectURL(jsonUrl);
+        const status = document.getElementById('plyExportStatus');
+        if (status) status.textContent = `Exported 16-bit heightmap ${raster.width}×${raster.height}. Use elevation.raw + elevation.json.`;
+    }
+
+    function exportHeightmap8() {
+        const holeSplat = getActiveHoleSplatForTapFocus();
+        if (!holeSplat || !holeSplat.lumaSplatsWebGL || !holeSplat.lumaSplatsWebGL.loader) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Splat not ready. Wait for load.';
+            return;
+        }
+        const c = plyExportState.center;
+        if (!c) return;
+        const loader = holeSplat.lumaSplatsWebGL.loader;
+        const cpuPoints = loader.cpuPoints;
+        const pointCount = Number.isFinite(loader.cpuPtsCount) ? loader.cpuPtsCount : (loader.numSplats ? Math.floor(loader.numSplats) : undefined);
+        holeSplat.updateMatrixWorld(true);
+        const result = extractPointsInSphere({
+            cpuPoints,
+            pointCount,
+            center: c,
+            radius: plyExportState.radius,
+            matrixWorldElements: holeSplat.matrixWorld.elements
+        });
+        if (!result || result.count === 0) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'No points in selection. Try larger radius.';
+            return;
+        }
+        const resEl = document.getElementById('heightmapResolution');
+        const res = Math.max(1, Math.min(4096, parseInt(resEl?.value || '1024', 10) || 1024));
+        const fillHoles = document.getElementById('heightmapFillHoles')?.checked === true;
+        const raster = rasterizePointsToHeightmap(result.points, res, res, {
+            centerX: c.x,
+            centerZ: c.z,
+            radius: plyExportState.radius,
+            fillHoles
+        });
+        if (!raster) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Heightmap rasterization failed.';
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = raster.width;
+        canvas.height = raster.height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(raster.width, raster.height);
+        for (let i = 0; i < raster.data.length; i++) {
+            const v = raster.data[i];
+            const gray = v === 0 ? 0 : Math.min(255, Math.max(0, Math.round(((v - 1) / 65534) * 256)));
+            const o = i * 4;
+            imgData.data[o] = imgData.data[o + 1] = imgData.data[o + 2] = gray;
+            imgData.data[o + 3] = 255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'elevation.png';
+            a.click();
+            URL.revokeObjectURL(url);
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = `Exported 8-bit PNG ${raster.width}×${raster.height}.`;
+        }, 'image/png');
+    }
+
+    function exportNormalMap() {
+        const holeSplat = getActiveHoleSplatForTapFocus();
+        if (!holeSplat || !holeSplat.lumaSplatsWebGL || !holeSplat.lumaSplatsWebGL.loader) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Splat not ready. Wait for load.';
+            return;
+        }
+        const c = plyExportState.center;
+        if (!c) return;
+        const loader = holeSplat.lumaSplatsWebGL.loader;
+        const cpuPoints = loader.cpuPoints;
+        const pointCount = Number.isFinite(loader.cpuPtsCount) ? loader.cpuPtsCount : (loader.numSplats ? Math.floor(loader.numSplats) : undefined);
+        holeSplat.updateMatrixWorld(true);
+        const result = extractPointsInSphere({
+            cpuPoints,
+            pointCount,
+            center: c,
+            radius: plyExportState.radius,
+            matrixWorldElements: holeSplat.matrixWorld.elements
+        });
+        if (!result || result.count === 0) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'No points in selection. Try larger radius.';
+            return;
+        }
+        const resEl = document.getElementById('heightmapResolution');
+        const res = Math.max(1, Math.min(4096, parseInt(resEl?.value || '1024', 10) || 1024));
+        const fillHoles = document.getElementById('heightmapFillHoles')?.checked === true;
+        const raster = rasterizePointsToHeightmap(result.points, res, res, {
+            centerX: c.x,
+            centerZ: c.z,
+            radius: plyExportState.radius,
+            fillHoles
+        });
+        if (!raster) {
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = 'Heightmap rasterization failed.';
+            return;
+        }
+        const pixelSizeX = (2 * plyExportState.radius) / raster.width;
+        const pixelSizeZ = (2 * plyExportState.radius) / raster.height;
+        const rgba = deriveNormalMapFromHeightmap(raster.data, raster.width, raster.height, raster.minY, raster.maxY, pixelSizeX, pixelSizeZ);
+        const canvas = document.createElement('canvas');
+        canvas.width = raster.width;
+        canvas.height = raster.height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(raster.width, raster.height);
+        imgData.data.set(rgba);
+        ctx.putImageData(imgData, 0, 0);
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'elevation_normal.png';
+            a.click();
+            URL.revokeObjectURL(url);
+            const status = document.getElementById('plyExportStatus');
+            if (status) status.textContent = `Exported normal map ${raster.width}×${raster.height}.`;
+        }, 'image/png');
     }
 
     function syncSplatEditorFromConfig() {
@@ -4359,6 +4752,26 @@
     if (splatEditorCloseButton) {
         splatEditorCloseButton.addEventListener('click', () => setSplatEditorOpen(false));
     }
+    const plyExportToggle = document.getElementById('plyExportToggle');
+    const plyExportCloseButton = document.getElementById('plyExportCloseButton');
+    const plyRadiusSlider = document.getElementById('plyRadiusSlider');
+    const plyExportButton = document.getElementById('plyExportButton');
+    if (plyExportToggle) plyExportToggle.addEventListener('click', () => setPlyExportOpen(!plyExportState.open));
+    if (plyExportCloseButton) plyExportCloseButton.addEventListener('click', () => setPlyExportOpen(false));
+    if (plyRadiusSlider) {
+        plyRadiusSlider.addEventListener('input', () => {
+            plyExportState.radius = parseFloat(plyRadiusSlider.value) || 5;
+            updatePlyExportSphere();
+            syncPlyExportUI();
+        });
+    }
+    if (plyExportButton) plyExportButton.addEventListener('click', exportPlyToFile);
+    const heightmap16ExportButton = document.getElementById('heightmap16ExportButton');
+    const heightmap8ExportButton = document.getElementById('heightmap8ExportButton');
+    const normalMapExportButton = document.getElementById('normalMapExportButton');
+    if (heightmap16ExportButton) heightmap16ExportButton.addEventListener('click', exportHeightmap16);
+    if (heightmap8ExportButton) heightmap8ExportButton.addEventListener('click', exportHeightmap8);
+    if (normalMapExportButton) normalMapExportButton.addEventListener('click', exportNormalMap);
     [splatPosX, splatPosY, splatPosZ, splatRotX, splatRotY, splatRotZ, splatScale].forEach((input) => {
         if (!input) return;
         input.addEventListener('input', () => applySplatEditorToConfig());
@@ -4389,6 +4802,10 @@
 
     window.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
+        if (plyExportState.open) {
+            setPlyExportOpen(false);
+            return;
+        }
         if (splatEditorState.open) {
             setSplatEditorOpen(false);
             return;
