@@ -100,6 +100,18 @@ export function initPathAnimation(options = {}) {
   let pathState = allPaths[0];
   let currentSceneOrigin = { ...sceneOrigin };
 
+  // Cache the original menu position so we can re-anchor it when
+  // changing canvas formats (desktop ↔ vertical, etc.).
+  let baseMenuBottom = 20;
+  let baseMenuLeft = 20;
+  if (menuContainer && typeof window.getComputedStyle === 'function') {
+    const cs = getComputedStyle(menuContainer);
+    const parsedBottom = parseFloat(cs.bottom);
+    const parsedLeft = parseFloat(cs.left);
+    if (Number.isFinite(parsedBottom)) baseMenuBottom = parsedBottom;
+    if (Number.isFinite(parsedLeft)) baseMenuLeft = parsedLeft;
+  }
+
   function loadSavedPaths() {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -438,13 +450,17 @@ export function initPathAnimation(options = {}) {
   }
 
   function adjustUIForCanvasFormat() {
-    if (!menuContainer || !activeCanvasFormat) return;
+    if (!menuContainer) return;
+    // When no special canvas format is active, snap back to the original
+    // bottom-left anchor recorded at init time.
+    if (!activeCanvasFormat) {
+      menuContainer.style.bottom = baseMenuBottom + 'px';
+      menuContainer.style.left = baseMenuLeft + 'px';
+      return;
+    }
     const { x, y } = getCanvasFormatOffset();
-    if (x === 0 && y === 0) return;
-    const curBottom = parseFloat(menuContainer.style.bottom) || 0;
-    const curLeft = parseFloat(menuContainer.style.left) || 0;
-    menuContainer.style.bottom = (curBottom + y) + 'px';
-    menuContainer.style.left = (curLeft + x) + 'px';
+    menuContainer.style.bottom = (baseMenuBottom + y) + 'px';
+    menuContainer.style.left = (baseMenuLeft + x) + 'px';
   }
 
   function applyCanvasFormat(format) {
@@ -459,6 +475,9 @@ export function initPathAnimation(options = {}) {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       document.body.classList.remove('canvas-format-active');
+      // Restore menu to its original anchored position when leaving
+      // a special canvas format.
+      requestAnimationFrame(() => adjustUIForCanvasFormat());
       window.dispatchEvent(new Event('resize'));
       return;
     }
