@@ -202,6 +202,7 @@ function ensureStyles() {
 function getOrCreateTopRightToolbarWrap() {
   return (
     document.getElementById('pathAnimationEditorTogglesWrap') ||
+    document.getElementById('editorTogglesWrap') ||
     document.getElementById('wolfTopRightToolbarWrap') ||
     (() => {
       const wrap = document.createElement('div');

@@ -53,6 +53,7 @@ export function initPathAnimation(options = {}) {
     startPosition = { x: 0, y: 0.2, z: 2.5 },
     menuContainer,
     initialPath = {},
+    paths: pathsOption,
     propertyLabel = 'property'
   } = options;
 
@@ -61,7 +62,6 @@ export function initPathAnimation(options = {}) {
     return { update: () => {}, getState: () => ({ enabled: false, playing: false }) };
   }
 
-  const defaults = initialPath && typeof initialPath === 'object' ? initialPath : {};
   const sanitizeCheckpoint = (raw) => {
     const pos = sanitizePathVector(raw?.position, startPosition);
     const lookAt = sanitizePathVector(raw?.lookAt, sceneOrigin);
@@ -71,18 +71,70 @@ export function initPathAnimation(options = {}) {
     return { position: pos, lookAt, duration, pauseAt, pauseDuration };
   };
 
-  const pathState = {
-    enabled: !!defaults.enabled,
-    loop: defaults.loop !== false,
-    speed: Number.isFinite(defaults.speed) && defaults.speed > 0 ? defaults.speed : 1,
-    checkpoints: Array.isArray(defaults.checkpoints) ? defaults.checkpoints.map(sanitizeCheckpoint) : [],
-    playing: false,
-    segmentIndex: 0,
-    segmentElapsed: 0,
-    lookAtOverrideAtStart: null,
-    pausedAtCheckpoint: null,
-    pauseElapsed: 0
-  };
+  function createPathState(defaults) {
+    const d = defaults && typeof defaults === 'object' ? defaults : {};
+    return {
+      enabled: !!d.enabled,
+      loop: d.loop !== false,
+      speed: Number.isFinite(d.speed) && d.speed > 0 ? d.speed : 1,
+      checkpoints: Array.isArray(d.checkpoints) ? d.checkpoints.map(sanitizeCheckpoint) : [],
+      playing: false,
+      segmentIndex: 0,
+      segmentElapsed: 0,
+      lookAtOverrideAtStart: null,
+      pausedAtCheckpoint: null,
+      pauseElapsed: 0
+    };
+  }
+
+  const storageKey = `path-anim:${propertyLabel}`;
+
+  const isMultiPath = Array.isArray(pathsOption) && pathsOption.length > 0;
+  const allPaths = isMultiPath
+    ? pathsOption.map((p) => createPathState(p))
+    : [createPathState(initialPath)];
+  const pathLabels = isMultiPath
+    ? pathsOption.map((p, i) => (p && p.label) || `Path ${i + 1}`)
+    : [];
+  let activePathIndex = 0;
+  let pathState = allPaths[0];
+  let currentSceneOrigin = { ...sceneOrigin };
+
+  function loadSavedPaths() {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (isMultiPath && Array.isArray(saved)) {
+        saved.forEach((savedPath, i) => {
+          if (i < allPaths.length && savedPath && Array.isArray(savedPath.checkpoints)) {
+            allPaths[i].checkpoints = savedPath.checkpoints.map(sanitizeCheckpoint);
+            if (Number.isFinite(savedPath.speed) && savedPath.speed > 0) allPaths[i].speed = savedPath.speed;
+            if (savedPath.checkpoints.length >= 2) allPaths[i].enabled = true;
+          }
+        });
+      } else if (!isMultiPath && saved && Array.isArray(saved.checkpoints)) {
+        allPaths[0].checkpoints = saved.checkpoints.map(sanitizeCheckpoint);
+        if (Number.isFinite(saved.speed) && saved.speed > 0) allPaths[0].speed = saved.speed;
+        if (saved.checkpoints.length >= 2) allPaths[0].enabled = true;
+      }
+    } catch (e) {
+      // Ignore corrupt storage
+    }
+  }
+
+  function persistPaths() {
+    try {
+      const payload = isMultiPath
+        ? allPaths.map((ps) => ({ checkpoints: ps.checkpoints, speed: ps.speed }))
+        : { checkpoints: allPaths[0].checkpoints, speed: allPaths[0].speed };
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch (e) {
+      // Ignore storage errors (e.g. private browsing quota)
+    }
+  }
+
+  loadSavedPaths();
 
   const tempPosition = vec3(0, 0, 0);
   const tempLookAt = vec3(0, 0, 0);
@@ -237,8 +289,8 @@ export function initPathAnimation(options = {}) {
     };
   }
 
-  function getSerializedPayload() {
-    const checkpoints = pathState.checkpoints.map((cp) => ({
+  function serializeSinglePath(ps) {
+    const checkpoints = ps.checkpoints.map((cp) => ({
       position: { x: +cp.position.x.toFixed(6), y: +cp.position.y.toFixed(6), z: +cp.position.z.toFixed(6) },
       lookAt: { x: +cp.lookAt.x.toFixed(6), y: +cp.lookAt.y.toFixed(6), z: +cp.lookAt.z.toFixed(6) },
       duration: +Math.max(0.1, cp.duration || 5).toFixed(3),
@@ -246,17 +298,27 @@ export function initPathAnimation(options = {}) {
       pauseDuration: +Math.max(0, Math.min(60, cp.pauseDuration ?? 1)).toFixed(2)
     }));
     return {
-      enabled: !!pathState.enabled,
-      loop: !!pathState.loop,
-      speed: +Math.max(0.1, pathState.speed || 1).toFixed(3),
+      enabled: !!ps.enabled,
+      loop: !!ps.loop,
+      speed: +Math.max(0.1, ps.speed || 1).toFixed(3),
       checkpoints
     };
   }
 
-  function goToAnimationStart() {
+  function getSerializedPayload() {
+    if (isMultiPath) {
+      return allPaths.map((ps, i) => ({
+        label: pathLabels[i] || `Path ${i + 1}`,
+        ...serializeSinglePath(ps)
+      }));
+    }
+    return serializeSinglePath(pathState);
+  }
+
+  function goToAnimationStart(lookAtOverride) {
     if (!pathState.enabled || !pathState.checkpoints.length) return;
     if (pathState.checkpoints.length < 2) return;
-    pathState.lookAtOverrideAtStart = { ...sceneOrigin };
+    pathState.lookAtOverrideAtStart = lookAtOverride ? { ...lookAtOverride } : { ...currentSceneOrigin };
     pathState.segmentIndex = 0;
     pathState.segmentElapsed = 0;
     pathState.pausedAtCheckpoint = null;
@@ -607,6 +669,10 @@ export function initPathAnimation(options = {}) {
 
   function syncUI() {
     syncSelectedIndex();
+    const labelEl = document.getElementById('pathAnimationActiveLabel');
+    if (labelEl) {
+      labelEl.textContent = isMultiPath ? ' — ' + (pathLabels[activePathIndex] || '') : '';
+    }
     if (statusEl) {
       if (pathState.playing && pathState.checkpoints.length >= 2 && pathState.segmentIndex === 0) {
         setStatus('Playing from start.');
@@ -676,6 +742,7 @@ export function initPathAnimation(options = {}) {
     }
     renderCheckpointStrip();
     if (typeof window.__cameraAnimationPath !== 'undefined') window.__cameraAnimationPath = getSerializedPayload();
+    persistPaths();
   }
 
   function setPathEnabled(enabled) {
@@ -720,7 +787,7 @@ export function initPathAnimation(options = {}) {
     if (pathState.checkpoints.length < 2) { pathState.playing = false; syncUI(); return; }
     pathState.playing = !pathState.playing;
     if (pathState.playing && pathState.segmentIndex === 0 && pathState.segmentElapsed === 0) {
-      pathState.lookAtOverrideAtStart = { ...sceneOrigin };
+      pathState.lookAtOverrideAtStart = { ...currentSceneOrigin };
     }
     setStatus(pathState.playing ? 'Playing.' : 'Paused.');
     syncUI();
@@ -847,6 +914,54 @@ export function initPathAnimation(options = {}) {
         cursor: pointer; text-align: center; transition: background 0.15s;
       }
       .record-format-cancel:hover { background: rgba(255,255,255,0.08); }
+
+      body.touch-sim-mode, body.touch-sim-mode * { cursor: none !important; }
+      body.touch-sim-mode .menu-container,
+      body.touch-sim-mode .menu-container *,
+      body.touch-sim-mode .path-animation-editor-toggles-wrap,
+      body.touch-sim-mode .path-animation-editor-toggles-wrap *,
+      body.touch-sim-mode .path-animation-editor-panel,
+      body.touch-sim-mode .path-animation-editor-panel * { cursor: auto !important; }
+      #touchSimOverlay { position: fixed; inset: 0; pointer-events: none; z-index: 999999; }
+      .touch-sim-dot {
+        position: absolute; width: 14px; height: 14px; border-radius: 999px;
+        background: rgba(255,255,255,0.95);
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.25), 0 10px 24px rgba(0,0,0,0.35);
+        transform: translate(-50%,-50%) scale(0.35); opacity: 0;
+        animation: touchSimIn 120ms ease-out forwards;
+      }
+      .touch-sim-dot::after {
+        content: ''; position: absolute; inset: -10px; border-radius: inherit;
+        border: 2px solid rgba(255,255,255,0.55); opacity: 0;
+        animation: touchSimRingIn 180ms ease-out forwards;
+      }
+      .touch-sim-dot.releasing {
+        animation: touchSimOut 320ms ease-out forwards;
+      }
+      .touch-sim-dot.releasing::after {
+        animation: touchSimRingOut 320ms ease-out forwards;
+      }
+      @keyframes touchSimIn {
+        0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.35); }
+        100% { opacity: 1; transform: translate(-50%,-50%) scale(1.0); }
+      }
+      @keyframes touchSimRingIn {
+        0%   { opacity: 0; transform: scale(0.6); }
+        100% { opacity: 0.7; transform: scale(1.0); }
+      }
+      @keyframes touchSimOut {
+        0%   { opacity: 1; transform: translate(-50%,-50%) scale(1.0); }
+        100% { opacity: 0; transform: translate(-50%,-50%) scale(1.25); }
+      }
+      @keyframes touchSimRingOut {
+        0%   { opacity: 0.7; transform: scale(1.0); }
+        100% { opacity: 0; transform: scale(1.35); }
+      }
+      #touchSimToggleButton { color: #fff; }
+      #touchSimToggleButton svg { width: 21px; height: 21px; }
+      #touchSimToggleButton.touch-sim-active { background: rgba(191,40,27,0.4); border-color: rgba(191,40,27,0.5); }
+      body.recording-mode #touchSimToggleButton,
+      body.recording-mode #touchSimOverlay { visibility: hidden !important; pointer-events: none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -854,9 +969,15 @@ export function initPathAnimation(options = {}) {
   function createUI() {
     injectStyles();
 
-    const wrap = document.createElement('div');
-    wrap.className = 'path-animation-editor-toggles-wrap';
-    wrap.id = 'pathAnimationEditorTogglesWrap';
+    let wrap = document.getElementById('editorTogglesWrap')
+           || document.getElementById('wolfTopRightToolbarWrap')
+           || document.getElementById('pathAnimationEditorTogglesWrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'path-animation-editor-toggles-wrap';
+      wrap.id = 'pathAnimationEditorTogglesWrap';
+      wrap.__created = true;
+    }
 
     toggleBtn = document.createElement('button');
     toggleBtn.type = 'button';
@@ -864,7 +985,7 @@ export function initPathAnimation(options = {}) {
     toggleBtn.setAttribute('aria-label', 'Path animation editor');
     toggleBtn.setAttribute('title', 'Create and edit flight path');
     toggleBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
-    wrap.appendChild(toggleBtn);
+    wrap.prepend(toggleBtn);
 
     panelEl = document.createElement('div');
     panelEl.className = 'path-animation-editor-panel';
@@ -872,7 +993,7 @@ export function initPathAnimation(options = {}) {
     panelEl.setAttribute('aria-live', 'polite');
     panelEl.innerHTML = `
       <div class="path-animation-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <div class="path-animation-title">Path</div>
+        <div class="path-animation-title">Path<span id="pathAnimationActiveLabel" style="font-weight:400;opacity:0.7"></span></div>
         <button type="button" class="path-animation-close" aria-label="Close" style="width:24px;height:24px;border:1px solid rgba(255,255,255,0.2);border-radius:12px;background:rgba(0,0,0,0.3);color:#fff;cursor:pointer;font:500 14px/1 sans-serif">×</button>
       </div>
       <div id="pathAnimationStatus" class="path-animation-status"></div>
@@ -1016,7 +1137,7 @@ export function initPathAnimation(options = {}) {
       syncUI();
     });
 
-    document.body.insertBefore(wrap, document.body.firstChild);
+    if (wrap.__created) document.body.insertBefore(wrap, document.body.firstChild);
 
     if (menuContainer && typeof menuContainer.appendChild === 'function') {
       recordBtnEl = document.createElement('div');
@@ -1050,9 +1171,85 @@ export function initPathAnimation(options = {}) {
       canvasFormatBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7V2h5M17 2h5v5M22 17v5h-5M7 22H2v-5"/></svg>';
       canvasFormatBtn.addEventListener('click', showCanvasFormatPicker);
       menuContainer.appendChild(canvasFormatBtn);
+
+      const touchSimBtn = document.createElement('div');
+      touchSimBtn.id = 'touchSimToggleButton';
+      touchSimBtn.className = 'menu-button';
+      touchSimBtn.setAttribute('title', 'Touch sim mode (T)');
+      touchSimBtn.setAttribute('aria-label', 'Toggle touch simulation mode');
+      touchSimBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 16"/></svg>';
+      menuContainer.appendChild(touchSimBtn);
+
+      const touchOverlay = document.createElement('div');
+      touchOverlay.id = 'touchSimOverlay';
+      document.body.appendChild(touchOverlay);
+
+      function isTouchSimOn() { return document.body.classList.contains('touch-sim-mode'); }
+      function setTouchSim(on) {
+        document.body.classList.toggle('touch-sim-mode', !!on);
+        touchSimBtn.classList.toggle('touch-sim-active', !!on);
+        try { localStorage.setItem('touchSimModeEnabled', on ? '1' : '0'); } catch (_) {}
+      }
+
+      touchSimBtn.addEventListener('click', () => setTouchSim(!isTouchSimOn()));
+
+      let activeDot = null;
+      function releaseDot() {
+        if (!activeDot) return;
+        const dot = activeDot;
+        activeDot = null;
+        dot.classList.add('releasing');
+        dot.addEventListener('animationend', () => dot.remove(), { once: true });
+      }
+
+      window.addEventListener('pointerdown', (e) => {
+        if (!isTouchSimOn()) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        releaseDot();
+        const dot = document.createElement('div');
+        dot.className = 'touch-sim-dot';
+        dot.style.left = e.clientX + 'px';
+        dot.style.top = e.clientY + 'px';
+        touchOverlay.appendChild(dot);
+        activeDot = dot;
+      }, true);
+
+      window.addEventListener('pointerup', releaseDot, true);
+      window.addEventListener('pointercancel', releaseDot, true);
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() !== 't') return;
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        setTouchSim(!isTouchSimOn());
+      });
+
+      try { if (localStorage.getItem('touchSimModeEnabled') === '1') setTouchSim(true); } catch (_) {}
     }
 
     setPathEnabled(pathState.enabled);
+  }
+
+  function setActivePath(index) {
+    const idx = clamp(Math.floor(index), 0, allPaths.length - 1);
+    if (idx === activePathIndex && pathState === allPaths[idx]) return;
+    pathState.playing = false;
+    activePathIndex = idx;
+    pathState = allPaths[idx];
+    pathState.segmentIndex = 0;
+    pathState.segmentElapsed = 0;
+    pathState.pausedAtCheckpoint = null;
+    pathState.pauseElapsed = 0;
+    editorState.selectedCheckpointIndex = 0;
+    syncUI();
+  }
+
+  function setSceneOrigin(origin) {
+    if (origin && typeof origin === 'object') {
+      currentSceneOrigin.x = Number.isFinite(origin.x) ? origin.x : currentSceneOrigin.x;
+      currentSceneOrigin.y = Number.isFinite(origin.y) ? origin.y : currentSceneOrigin.y;
+      currentSceneOrigin.z = Number.isFinite(origin.z) ? origin.z : currentSceneOrigin.z;
+    }
   }
 
   createUI();
@@ -1065,9 +1262,14 @@ export function initPathAnimation(options = {}) {
       return { enabled: pathState.enabled, playing: pathState.playing, pathState };
     },
     goToAnimationStart,
+    pause() { pathState.playing = false; syncUI(); },
     getSerializedPayload,
     recordPathAnimation,
     applyCanvasFormat,
-    showCanvasFormatPicker
+    showCanvasFormatPicker,
+    setActivePath,
+    getActivePathIndex() { return activePathIndex; },
+    getPathCount() { return allPaths.length; },
+    setSceneOrigin
   };
 }

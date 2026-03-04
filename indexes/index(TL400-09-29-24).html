@@ -560,6 +560,16 @@ function createHotspot(hotspotConfig, index, totalHotspots) {
             });
         }).catch(err => console.warn('Path animation failed to load', err));
 
+    import('../shared/obj-home-editor.mjs').then(({ initObjHomeEditor }) => {
+        window.__homeEditor = initObjHomeEditor({
+            scene,
+            camera,
+            controls,
+            renderer,
+            propertyLabel: 'TL400'
+        });
+    }).catch(err => console.warn('Home model editor failed to load', err));
+
     // Compass button: restart flight path if available
     const compassButton = document.getElementById('compassButton');
     if (compassButton) {
@@ -614,5 +624,6 @@ function animate() {
 
     </script>
 
+<script type="module" src="../shared/properties-nav.mjs"></script>
 </body>
 </html>

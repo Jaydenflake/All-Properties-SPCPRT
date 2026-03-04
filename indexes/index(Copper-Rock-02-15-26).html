@@ -1154,9 +1154,6 @@
             display: flex;
             gap: 8px;
         }
-        .animation-editor-toggle-wrap {
-            margin: 0;
-        }
         .splat-editor-toggle-wrap {
             margin: 0;
         }
@@ -1224,133 +1221,6 @@
             font-size: 10px;
             color: rgba(255, 255, 255, 0.7);
         }
-        .animation-editor-summary {
-            margin: 0 0 4px;
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.6);
-            line-height: 1.2;
-        }
-        .animation-checkpoint-strip {
-            display: flex;
-            gap: 4px;
-            overflow-x: auto;
-            margin: 0 0 6px;
-            padding: 0 0 4px;
-            scrollbar-width: thin;
-            align-items: center;
-        }
-        .animation-checkpoint-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            flex-shrink: 0;
-        }
-        .animation-checkpoint-hover-actions {
-            display: flex;
-            gap: 2px;
-            margin-top: 4px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.15s ease;
-            justify-content: center;
-        }
-        .animation-checkpoint-item:hover .animation-checkpoint-hover-actions {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .animation-checkpoint-hover-actions button {
-            width: 24px;
-            height: 24px;
-            padding: 0;
-            font-size: 11px;
-            font-weight: 500;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            background: rgba(0, 0, 0, 0.5);
-            color: rgba(255, 255, 255, 0.9);
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: border-color 0.15s ease, background 0.15s ease;
-        }
-        .animation-checkpoint-hover-actions button:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.4);
-        }
-        .animation-checkpoint-hover-actions .animation-checkpoint-delete-btn {
-            color: #e85a4f;
-        }
-        .animation-checkpoint-hover-actions .animation-checkpoint-delete-btn:hover {
-            background: rgba(232, 90, 79, 0.35);
-        }
-        .animation-checkpoint-hover-actions .animation-checkpoint-overwrite-btn:hover {
-            background: rgba(76, 175, 80, 0.25);
-        }
-        .animation-checkpoint-hover-actions button svg {
-            width: 12px;
-            height: 12px;
-        }
-        .animation-checkpoint-strip::-webkit-scrollbar {
-            height: 6px;
-        }
-        .animation-checkpoint-strip::-webkit-scrollbar-thumb {
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.22);
-        }
-        .animation-checkpoint-pill {
-            width: 32px;
-            min-width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background: rgba(0, 0, 0, 0.3);
-            color: rgba(255, 255, 255, 0.92);
-            font: 500 11px/1 'Helvetica Neue', Arial, sans-serif;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            user-select: none;
-            -webkit-user-select: none;
-            transition: border-color 0.2s ease, background 0.2s ease;
-            position: relative;
-        }
-        .animation-checkpoint-pill .animation-checkpoint-pill-label {
-            transition: opacity 0.15s ease;
-        }
-        .animation-checkpoint-pill:hover {
-            border-color: rgba(255, 255, 255, 0.42);
-            background: rgba(0, 0, 0, 0.5);
-        }
-        .animation-checkpoint-pill.active {
-            border-color: rgba(255, 255, 255, 0.5);
-            background: rgba(191, 40, 27, 0.52);
-        }
-        .animation-checkpoint-pill.playing {
-            box-shadow: 0 0 0 2px rgba(191, 40, 27, 0.26);
-        }
-        .animation-editor-actions {
-            margin-top: 4px;
-            display: flex;
-            gap: 4px;
-        }
-        .animation-editor-actions .lot-editor-action-btn {
-            margin-top: 0;
-            padding: 8px;
-            min-width: 0;
-            flex: 1;
-        }
-        .animation-editor-btn-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .animation-editor-btn-icon svg {
-            width: 18px;
-            height: 18px;
-        }
         .splat-editor-panel {
             top: 66px;
             width: 260px;
@@ -1397,13 +1267,6 @@
                 top: 12px;
                 right: 12px;
             }
-            .animation-editor-panel {
-                left: auto;
-                right: 12px;
-                top: 66px;
-                bottom: auto;
-                width: min(260px, calc(100vw - 24px));
-            }
             .lot-editor-toggle-wrap {
                 right: 12px;
                 bottom: 12px;
@@ -1413,6 +1276,10 @@
                 bottom: 66px;
                 width: min(230px, calc(100vw - 24px));
             }
+        }
+
+
+
         }
     </style>
 </head>
@@ -1470,38 +1337,6 @@
                 <path d="M18 6l1.2-1.2a1.8 1.8 0 1 1 2.5 2.5L20.5 8.5"></path>
             </svg>
         </button>
-    </div>
-    <div class="animation-editor-toggle-wrap" id="animationEditorToggleWrap">
-        <button id="animationEditorToggle" class="lot-editor-toggle animation-editor-toggle-icon-only" type="button" aria-pressed="false" aria-label="Toggle camera path editor">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M4 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"></path>
-                <path d="M20 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"></path>
-                <path d="M12 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"></path>
-                <path d="M6.2 14.2 17.7 9"></path>
-                <path d="M10.4 18.3 6.3 16"></path>
-            </svg>
-        </button>
-    </div>
-    <div id="animationEditorPanel" class="lot-editor-panel animation-editor-panel" aria-live="polite">
-        <div class="animation-editor-header">
-            <div class="lot-editor-title">Path</div>
-            <button id="animationEditorCloseButton" class="animation-editor-close" type="button" aria-label="Close">×</button>
-        </div>
-        <div id="animationEditorStatus" class="lot-editor-status animation-editor-status-compact"></div>
-        <div id="animationEditorSummary" class="animation-editor-summary"></div>
-        <div id="animationCheckpointStrip" class="animation-checkpoint-strip" aria-label="Camera checkpoints"></div>
-        <div class="animation-editor-actions">
-            <button id="animationCaptureCheckpointButton" type="button" class="lot-editor-action-btn animation-editor-btn-icon" aria-label="Capture checkpoint" title="Capture (inserts after selected)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>
-            </button>
-            <button id="animationPlayToggleButton" type="button" class="lot-editor-action-btn animation-editor-btn-icon" aria-label="Play path" title="Play / Pause">
-                <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>
-            </button>
-            <button id="animationExportButton" type="button" class="lot-editor-action-btn animation-editor-btn-icon" aria-label="Copy JSON" title="Copy path JSON">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            </button>
-        </div>
     </div>
     </div>
 
@@ -1644,7 +1479,7 @@
 
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { LumaSplatsThree } from '@lumaai/luma-web';
-    import { sampleCpuPointsForFocus, findClosestSampleToRay, computeScreenDistancePx } from './tap-focus-refinement.mjs';
+    import { sampleCpuPointsForFocus, findClosestSampleToRay, computeScreenDistancePx } from '../Copper-Rock/tap-focus-refinement.mjs';
 
     function isChrome() {
         return /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
@@ -1761,7 +1596,7 @@
             responsiveness: 1.4
         },
         developerMode: false,  // Set this to true to activate developer mode
-        developerToolsVisible: false,  // Editor buttons (splat, lot, animation) in top right
+        developerToolsVisible: true,  // Editor buttons (splat, lot, animation) in top right
         splatEditor: {
             enabled: true,
             defaultOpen: false
@@ -1978,7 +1813,7 @@
             controls.target.z = clampRebound(controls.target.z, -tl.z, tl.z);
         }
         const preserveLookTargetY = (
-            (typeof pathAnimationState !== 'undefined' && pathAnimationState.enabled) ||
+            (window.__pathAnimation && window.__pathAnimation.getState().enabled) ||
             (typeof tapFocusTransition !== 'undefined' && tapFocusTransition.active)
         );
         if (!preserveLookTargetY) {
@@ -2286,13 +2121,11 @@
         borderDots = borderDotsByHole[activeHoleIndex] || {};
         borderLines = borderLinesByHole[activeHoleIndex] || [];
         borderLineConnections = borderLineConnectionsByHole[activeHoleIndex] || [];
-        pathAnimationState = pathAnimationStateByHole[activeHoleIndex] || pathAnimationStateByHole[0];
-        pathAnimationState.playing = false;
-        pathAnimationState.segmentIndex = 0;
-        pathAnimationState.segmentElapsed = 0;
-        if (pathAnimationState.enabled && pathAnimationState.checkpoints.length > 1) {
-            pathAnimationState.playing = true;
-            autoRotate = false;
+        if (window.__pathAnimation) {
+            window.__pathAnimation.setActivePath(activeHoleIndex);
+            const holeConfig = holeConfigurations[activeHoleIndex];
+            const viewTarget = holeConfig?.view?.target;
+            if (viewTarget) window.__pathAnimation.setSceneOrigin(viewTarget);
         }
         applyHoleSplatTransform(nextSplat, nextConfig);
         applyHoleView(nextConfig, resetCamera);
@@ -2300,7 +2133,6 @@
         updateHoleCarouselLabel();
         updateHoleCarouselButtons();
         if (typeof refreshBorderVisualState === 'function') refreshBorderVisualState();
-        if (typeof syncAnimationEditorFromState === 'function') syncAnimationEditorFromState();
         if (typeof syncSplatEditorFromConfig === 'function') syncSplatEditorFromConfig();
     }
 
@@ -2313,7 +2145,7 @@
     controls.addEventListener('change', () => {
         if (typeof tapFocusTransition !== 'undefined' && tapFocusTransition.active) return;
         const preserveLookTargetY = (
-            (typeof pathAnimationState !== 'undefined' && pathAnimationState.enabled) ||
+            (window.__pathAnimation && window.__pathAnimation.getState().enabled) ||
             (typeof manualFocusTargetY === 'number' && Number.isFinite(manualFocusTargetY))
         );
         if (!preserveLookTargetY) {
@@ -3127,226 +2959,71 @@
         updateMidpointButtons();
     });
 
-    const tempPathPosition = new Vector3();
-    const tempPathLookAt = new Vector3();
     let lastAnimationFrameTime = performance.now();
 
-    function sanitizePathVector(raw, fallback) {
-        return {
-            x: Number.isFinite(raw?.x) ? raw.x : fallback.x,
-            y: Number.isFinite(raw?.y) ? raw.y : fallback.y,
-            z: Number.isFinite(raw?.z) ? raw.z : fallback.z
-        };
-    }
-
-    function buildCheckpointFromCurrentView(duration = 5) {
-        return {
-            position: {
-                x: camera.position.x,
-                y: camera.position.y,
-                z: camera.position.z
-            },
-            lookAt: {
-                x: controls.target.x,
-                y: controls.target.y,
-                z: controls.target.z
-            },
-            duration: Number.isFinite(duration) && duration > 0 ? duration : 5
-        };
-    }
-
-    function sanitizePathCheckpoint(rawCheckpoint) {
-        const baseCamera = parameters.camera.startPosition;
-        const baseLookAt = parameters.scene.origin;
-        const position = sanitizePathVector(rawCheckpoint?.position, baseCamera);
-        const lookAt = sanitizePathVector(rawCheckpoint?.lookAt, baseLookAt);
-        const duration = Number.isFinite(rawCheckpoint?.duration) && rawCheckpoint.duration > 0.1 ? rawCheckpoint.duration : 5;
-        return { position, lookAt, duration };
-    }
-
-    function createPathAnimationStateForHole(holeIndex) {
-        const holeConfig = holeConfigurations[holeIndex];
-        const pathConfig = (holeConfig?.path === null ? parameters.animation.path : holeConfig?.path) || parameters.animation.path || {};
-        const defaults = pathConfig;
-        return {
-            enabled: !!defaults.enabled,
-            loop: defaults.loop !== false,
-            speed: Number.isFinite(defaults.speed) && defaults.speed > 0 ? defaults.speed : 1,
-            checkpoints: Array.isArray(defaults.checkpoints) ? defaults.checkpoints.map(sanitizePathCheckpoint) : [],
-            playing: false,
-            segmentIndex: 0,
-            segmentElapsed: 0,
-            lookAtOverrideAtStart: null
-        };
-    }
-    const pathAnimationStateByHole = holeConfigurations.map((_, i) => createPathAnimationStateForHole(i));
-    let pathAnimationState = pathAnimationStateByHole[0];
-
-    function getPathSegmentCount() {
-        const count = pathAnimationState.checkpoints.length;
-        if (count < 2) return 0;
-        return pathAnimationState.loop ? count : count - 1;
-    }
-
-    function getPathIndex(index) {
-        const count = pathAnimationState.checkpoints.length;
-        if (!count) return 0;
-        if (pathAnimationState.loop) {
-            return ((index % count) + count) % count;
-        }
-        return Math.min(Math.max(index, 0), count - 1);
-    }
-
-    function getPathCheckpoint(index) {
-        return pathAnimationState.checkpoints[getPathIndex(index)];
-    }
-
-    function getPathDurationForSegment(segmentIndex) {
-        const checkpoint = getPathCheckpoint(segmentIndex);
-        if (!checkpoint) return 5;
-        return Math.max(0.1, checkpoint.duration || 5);
-    }
-
-    function catmullRomScalar(p0, p1, p2, p3, t) {
-        const t2 = t * t;
-        const t3 = t2 * t;
-        return 0.5 * (
-            (2 * p1) +
-            (-p0 + p2) * t +
-            (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-            (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-        );
-    }
-
-    function catmullRomVector(v0, v1, v2, v3, t, out) {
-        out.set(
-            catmullRomScalar(v0.x, v1.x, v2.x, v3.x, t),
-            catmullRomScalar(v0.y, v1.y, v2.y, v3.y, t),
-            catmullRomScalar(v0.z, v1.z, v2.z, v3.z, t)
-        );
-        return out;
-    }
-
-    function applyPathCheckpoint(index) {
-        const checkpoint = getPathCheckpoint(index);
-        if (!checkpoint) return;
-        camera.position.set(checkpoint.position.x, checkpoint.position.y, checkpoint.position.z);
-        controls.target.set(checkpoint.lookAt.x, checkpoint.lookAt.y, checkpoint.lookAt.z);
-        camera.lookAt(controls.target);
-        controls.update();
-    }
-
-    function applyPathPose(segmentIndex, progress) {
-        const checkpointCount = pathAnimationState.checkpoints.length;
-        const segmentCount = getPathSegmentCount();
-        if (!segmentCount || checkpointCount < 2) return;
-        const clampedProgress = Math.min(Math.max(progress, 0), 1);
-        const i1 = pathAnimationState.loop
-            ? getPathIndex(segmentIndex)
-            : Math.min(Math.max(segmentIndex, 0), checkpointCount - 2);
-        const i2 = pathAnimationState.loop ? getPathIndex(i1 + 1) : Math.min(i1 + 1, checkpointCount - 1);
-        const p0 = getPathCheckpoint(i1 - 1).position;
-        const p1 = getPathCheckpoint(i1).position;
-        const p2 = getPathCheckpoint(i2).position;
-        const p3 = getPathCheckpoint(i2 + 1).position;
-        const l0 = getPathCheckpoint(i1 - 1).lookAt;
-        const l1 = getPathCheckpoint(i1).lookAt;
-        const l2 = getPathCheckpoint(i2).lookAt;
-        const l3 = getPathCheckpoint(i2 + 1).lookAt;
-        catmullRomVector(p0, p1, p2, p3, clampedProgress, tempPathPosition);
-        catmullRomVector(l0, l1, l2, l3, clampedProgress, tempPathLookAt);
-        camera.position.copy(tempPathPosition);
-        // Use primary focus lookAt at segment 0 start (animationStart mode)
-        const override = pathAnimationState.lookAtOverrideAtStart;
-        if (override && segmentIndex === 0 && clampedProgress < 0.02) {
-            controls.target.set(override.x, override.y, override.z);
-            if (clampedProgress >= 0.015) pathAnimationState.lookAtOverrideAtStart = null;  // Clear after brief hold
-        } else {
-            controls.target.copy(tempPathLookAt);
-        }
-        camera.lookAt(controls.target);
-    }
-
-    function updatePathAnimation(deltaSeconds) {
-        if (!pathAnimationState.enabled || !pathAnimationState.playing) return;
-        const segmentCount = getPathSegmentCount();
-        if (!segmentCount) {
-            pathAnimationState.playing = false;
-            if (typeof syncAnimationEditorFromState === 'function') syncAnimationEditorFromState();
-            return;
-        }
-        let endedPlayback = false;
-        let remaining = Math.max(0, deltaSeconds * pathAnimationState.speed);
-        while (remaining > 0 && pathAnimationState.playing) {
-            const duration = getPathDurationForSegment(pathAnimationState.segmentIndex);
-            const segmentRemaining = Math.max(0, duration - pathAnimationState.segmentElapsed);
-            if (remaining < segmentRemaining) {
-                pathAnimationState.segmentElapsed += remaining;
-                remaining = 0;
-                break;
-            }
-            remaining -= segmentRemaining;
-            if (pathAnimationState.loop) {
-                pathAnimationState.segmentIndex = (pathAnimationState.segmentIndex + 1) % segmentCount;
-                pathAnimationState.segmentElapsed = 0;
-                continue;
-            }
-            const lastSegment = segmentCount - 1;
-            if (pathAnimationState.segmentIndex >= lastSegment) {
-                pathAnimationState.segmentElapsed = getPathDurationForSegment(pathAnimationState.segmentIndex);
-                pathAnimationState.playing = false;
-                endedPlayback = true;
-                remaining = 0;
-                break;
-            }
-            pathAnimationState.segmentIndex += 1;
-            pathAnimationState.segmentElapsed = 0;
-        }
-        const duration = getPathDurationForSegment(pathAnimationState.segmentIndex);
-        const progress = duration > 0 ? Math.min(pathAnimationState.segmentElapsed / duration, 1) : 1;
-        applyPathPose(pathAnimationState.segmentIndex, progress);
-        if (endedPlayback && typeof syncAnimationEditorFromState === 'function') {
-            setAnimationEditorStatus('End of path. Press Play to restart.');
-            syncAnimationEditorFromState();
-        }
-    }
-
-    function getSerializedCameraPathPayload() {
-        const checkpoints = pathAnimationState.checkpoints.map((checkpoint) => ({
-            position: {
-                x: +checkpoint.position.x.toFixed(6),
-                y: +checkpoint.position.y.toFixed(6),
-                z: +checkpoint.position.z.toFixed(6)
-            },
-            lookAt: {
-                x: +checkpoint.lookAt.x.toFixed(6),
-                y: +checkpoint.lookAt.y.toFixed(6),
-                z: +checkpoint.lookAt.z.toFixed(6)
-            },
-            duration: +Math.max(0.1, checkpoint.duration || 5).toFixed(3)
-        }));
-        return {
-            enabled: !!pathAnimationState.enabled,
-            loop: !!pathAnimationState.loop,
-            speed: +Math.max(0.1, pathAnimationState.speed || 1).toFixed(3),
-            checkpoints
-        };
-    }
-
-    function syncSerializedPathToParameters() {
-        const holeConfig = holeConfigurations[activeHoleIndex];
-        if (holeConfig) {
-            if (!holeConfig.path) holeConfig.path = { enabled: true, loop: true, speed: 1, checkpoints: [] };
-            holeConfig.path = getSerializedCameraPathPayload();
-        }
-    }
-
-    if (pathAnimationState.enabled && pathAnimationState.checkpoints.length) {
-        applyPathCheckpoint(0);
-        if (pathAnimationState.checkpoints.length > 1) {
-            pathAnimationState.playing = true;
+    // Path animation (flight path + editor + recording) - shared module
+    import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
+        const menuContainerEl = document.getElementById('menuContainer');
+        const pathsConfig = holeConfigurations.map((hc, i) => {
+            const pathConfig = (hc.path === null ? parameters.animation.path : hc.path) || parameters.animation.path || {};
+            return {
+                label: hc.label || 'Path ' + (i + 1),
+                enabled: !!pathConfig.enabled,
+                loop: pathConfig.loop !== false,
+                speed: Number.isFinite(pathConfig.speed) && pathConfig.speed > 0 ? pathConfig.speed : 1,
+                checkpoints: Array.isArray(pathConfig.checkpoints) ? pathConfig.checkpoints : []
+            };
+        });
+        window.__pathAnimation = initPathAnimation({
+            camera,
+            controls,
+            renderer,
+            sceneOrigin: parameters.scene.origin,
+            startPosition: parameters.camera.startPosition,
+            menuContainer: menuContainerEl,
+            paths: pathsConfig,
+            propertyLabel: 'Copper-Rock'
+        });
+        const firstPath = window.__pathAnimation.getState();
+        if (firstPath.enabled && firstPath.pathState && firstPath.pathState.checkpoints.length > 1) {
+            const focus = getPrimaryFocusPoint();
+            window.__pathAnimation.goToAnimationStart(focus);
             autoRotate = false;
         }
+    }).catch(err => console.warn('Path animation failed to load', err));
+
+    import('../shared/obj-home-editor.mjs').then(({ initObjHomeEditor }) => {
+        window.__homeEditor = initObjHomeEditor({
+            scene,
+            camera,
+            controls,
+            renderer,
+            propertyLabel: 'Copper-Rock'
+        });
+    }).catch(err => console.warn('Home model editor failed to load', err));
+
+    function goToAnimationStart() {
+        if (!window.__pathAnimation) return;
+        const state = window.__pathAnimation.getState();
+        if (!state.enabled || !state.pathState || state.pathState.checkpoints.length < 2) return;
+        manualFocusTargetY = null;
+        if (typeof tapFocusTransition !== 'undefined') {
+            tapFocusTransition.active = false;
+            tapFocusState.debug.transitionActive = false;
+            tapFocusState.debug.transitionProgress = 0;
+            tapFocusFeedback.active = false;
+            tapFocusState.debug.feedbackActive = false;
+            tapFocusState.debug.feedbackProgress = 0;
+            if (tapFocusFeedbackEl) {
+                tapFocusFeedbackEl.style.opacity = '0';
+                tapFocusFeedbackEl.style.display = 'none';
+            }
+        }
+        autoRotate = false;
+        isAnimatingToNorth = false;
+        ignoreNextPauseUntil = performance.now() + 150;
+        const primaryFocus = getPrimaryFocusPoint();
+        window.__pathAnimation.goToAnimationStart(primaryFocus);
     }
 
     // Enhanced compass logic with icon switching
@@ -3379,9 +3056,9 @@
         let iconRotation = 0;
         
         if (mode === 'animationstart') {
-            // In animationStart mode: filled when at segment 0, arrow always points at primary focus
-            const isAtAnimationStart = pathAnimationState.enabled && pathAnimationState.checkpoints.length >= 2
-                && pathAnimationState.segmentIndex === 0;
+            const paState = window.__pathAnimation ? window.__pathAnimation.getState() : {};
+            const isAtAnimationStart = paState.enabled && paState.pathState && paState.pathState.checkpoints && paState.pathState.checkpoints.length >= 2
+                && paState.pathState.segmentIndex === 0;
             targetSrc = isAtAnimationStart ? filledIcon : outlineIcon;
             // Rotate arrow to always point at primary focus (hole target / tap dot)
             const primaryFocus = getPrimaryFocusPoint();
@@ -3430,59 +3107,6 @@
         return { ...parameters.scene.origin };
     }
 
-    // Jump to animation path checkpoint 0 and start playing; camera faces primary focus (hole target / tap dot)
-    function goToAnimationStart() {
-        if (!pathAnimationState.enabled || !pathAnimationState.checkpoints.length) {
-            if (typeof setAnimationEditorStatus === 'function') {
-                setAnimationEditorStatus('No path checkpoints. Add checkpoints first.');
-            }
-            return;
-        }
-        if (pathAnimationState.checkpoints.length < 2) {
-            if (typeof setAnimationEditorStatus === 'function') {
-                setAnimationEditorStatus('Add 2+ checkpoints.');
-            }
-            return;
-        }
-        // Clear tap focus so animation uses its intended orbit/look-at points
-        manualFocusTargetY = null;
-        if (typeof tapFocusTransition !== 'undefined') {
-            tapFocusTransition.active = false;
-            tapFocusState.debug.transitionActive = false;
-            tapFocusState.debug.transitionProgress = 0;
-            tapFocusFeedback.active = false;
-            tapFocusState.debug.feedbackActive = false;
-            tapFocusState.debug.feedbackProgress = 0;
-            if (tapFocusFeedbackEl) {
-                tapFocusFeedbackEl.style.opacity = '0';
-                tapFocusFeedbackEl.style.display = 'none';
-            }
-        }
-        const primaryFocus = getPrimaryFocusPoint();
-        pathAnimationState.lookAtOverrideAtStart = primaryFocus;
-        pathAnimationState.segmentIndex = 0;
-        pathAnimationState.segmentElapsed = 0;
-        animationEditorState.selectedCheckpointIndex = 0;
-        autoRotate = false;
-        isAnimatingToNorth = false;
-        // Apply checkpoint 0 position but look at primary focus (not north)
-        const cp0 = getPathCheckpoint(0);
-        if (cp0) {
-            camera.position.set(cp0.position.x, cp0.position.y, cp0.position.z);
-            controls.target.set(primaryFocus.x, primaryFocus.y, primaryFocus.z);
-            camera.lookAt(controls.target);
-            controls.update();
-        }
-        pathAnimationState.playing = true;
-        ignoreNextPauseUntil = performance.now() + 150;
-        if (typeof setAnimationEditorStatus === 'function') {
-            setAnimationEditorStatus('Playing from start.');
-        }
-        if (typeof syncAnimationEditorFromState === 'function') {
-            syncAnimationEditorFromState();
-        }
-    }
-
     // Smooth camera animation to face north
     function animateCameraToNorth() {
         if (isAnimatingToNorth) return; // Prevent multiple animations
@@ -3507,14 +3131,8 @@
         // Start animation
         isAnimatingToNorth = true;
         animationStartTime = performance.now();
-        autoRotate = false; // Disable auto-rotation during animation
-        pathAnimationState.playing = false;
-        if (typeof syncAnimationEditorFromState === 'function') {
-            syncAnimationEditorFromState();
-        }
-        if (typeof setAnimationEditorStatus === 'function') {
-            setAnimationEditorStatus('Paused path playback while rotating north.');
-        }
+        autoRotate = false;
+        if (window.__pathAnimation) window.__pathAnimation.pause();
         
     }
 
@@ -3544,19 +3162,14 @@
     }
 
     function animate(now = performance.now()) {
-        if (window.__pathAnimation) {
-            if (window.__pathAnimationLastTime == null) window.__pathAnimationLastTime = now;
-            const deltaForShared = Math.min((now - window.__pathAnimationLastTime) / 1000, 0.1);
-            window.__pathAnimationLastTime = now;
-            window.__pathAnimation.update(deltaForShared);
-        }
-
         const deltaSeconds = Math.min(Math.max((now - lastAnimationFrameTime) / 1000, 0), 0.1);
         lastAnimationFrameTime = now;
+        if (window.__pathAnimation) {
+            window.__pathAnimation.update(deltaSeconds);
+        }
         if (!isAnimatingToNorth) {
-            if (pathAnimationState.enabled && pathAnimationState.playing) {
-                updatePathAnimation(deltaSeconds);
-            } else if (autoRotate && (!window.__pathAnimation || !window.__pathAnimation.getState().playing)) {
+            const pathPlaying = window.__pathAnimation && window.__pathAnimation.getState().playing;
+            if (!pathPlaying && autoRotate) {
                 angle += parameters.animation.speed;
                 const c = parameters.animation.center;
                 camera.position.x = c.x + Math.sin(angle) * parameters.animation.startRadius;
@@ -3703,14 +3316,8 @@
             tapFocusState.debug.transitionProgress = 1;
         }
         autoRotate = false;
-        if (pathAnimationState.playing) {
-            pathAnimationState.playing = false;
-            if (typeof syncAnimationEditorFromState === 'function') {
-                syncAnimationEditorFromState();
-            }
-            if (typeof setAnimationEditorStatus === 'function') {
-                setAnimationEditorStatus('Paused camera path while manually navigating.');
-            }
+        if (window.__pathAnimation && window.__pathAnimation.getState().playing) {
+            window.__pathAnimation.pause();
         }
     }
 
@@ -3724,20 +3331,6 @@
         if (performance.now() < ignoreNextPauseUntil) return;
         pauseCameraAutomationFromInteraction();
     });
-
-    // Path animation (flight path + editor + recording) - shared module
-    import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
-        const menuContainerEl = document.getElementById('menuContainer');
-        window.__pathAnimation = initPathAnimation({
-            camera,
-            controls,
-            renderer,
-            sceneOrigin: parameters.scene.origin,
-            startPosition: parameters.camera.startPosition,
-            menuContainer: menuContainerEl,
-            propertyLabel: 'Copper-Rock'
-        });
-    }).catch(err => console.warn('Path animation failed to load', err));
 
     let lastPointerDownForTapDot = { x: 0, y: 0 };
     let suppressTapDotClickUntil = 0;
@@ -3876,16 +3469,6 @@
     const lotVertexZInput = document.getElementById('lotVertexZInput');
     const lotCopyJsonButton = document.getElementById('lotCopyJsonButton');
     const lotMidpointLayer = document.getElementById('lotMidpointLayer');
-    const animationEditorToggleWrap = document.getElementById('animationEditorToggleWrap');
-    const animationEditorToggle = document.getElementById('animationEditorToggle');
-    const animationEditorPanel = document.getElementById('animationEditorPanel');
-    const animationEditorCloseButton = document.getElementById('animationEditorCloseButton');
-    const animationEditorStatus = document.getElementById('animationEditorStatus');
-    const animationEditorSummary = document.getElementById('animationEditorSummary');
-    const animationCheckpointStrip = document.getElementById('animationCheckpointStrip');
-    const animationCaptureCheckpointButton = document.getElementById('animationCaptureCheckpointButton');
-    const animationPlayToggleButton = document.getElementById('animationPlayToggleButton');
-    const animationExportButton = document.getElementById('animationExportButton');
     const splatEditorToggleWrap = document.getElementById('splatEditorToggleWrap');
     const splatEditorToggle = document.getElementById('splatEditorToggle');
     const splatEditorPanel = document.getElementById('splatEditorPanel');
@@ -3939,343 +3522,7 @@
     let startCameraPosition = new Vector3();
     let targetCameraPosition = new Vector3();
     const animationDuration = 1500; // 1.5 seconds
-    const animationEditorState = {
-        enabled: !!(parameters.animation.editor && parameters.animation.editor.enabled),
-        open: false,
-        selectedCheckpointIndex: 0,
-        lastExportJson: ''
-    };
-
     setActiveHole(0, { resetCamera: true });
-
-    function setAnimationEditorStatus(message) {
-        if (animationEditorStatus) {
-            animationEditorStatus.textContent = message;
-        }
-    }
-
-    function getSelectedPathCheckpoint() {
-        const index = animationEditorState.selectedCheckpointIndex;
-        return pathAnimationState.checkpoints[index] || null;
-    }
-
-    function getTotalPathSeconds() {
-        const checkpoints = pathAnimationState.checkpoints;
-        const count = checkpoints.length;
-        if (!count) return 0;
-        if (count === 1) return Math.max(0.1, checkpoints[0].duration || 5);
-        const finalIndex = pathAnimationState.loop ? count : count - 1;
-        let total = 0;
-        for (let i = 0; i < finalIndex; i++) {
-            total += Math.max(0.1, checkpoints[i].duration || 5);
-        }
-        return total;
-    }
-
-    function syncSelectedCheckpointIndex() {
-        const count = pathAnimationState.checkpoints.length;
-        if (!count) {
-            animationEditorState.selectedCheckpointIndex = 0;
-            return;
-        }
-        animationEditorState.selectedCheckpointIndex = Math.min(
-            Math.max(animationEditorState.selectedCheckpointIndex, 0),
-            count - 1
-        );
-    }
-
-    function deleteCheckpointAtIndex(index) {
-        if (!pathAnimationState.checkpoints.length || index < 0 || index >= pathAnimationState.checkpoints.length) return;
-        pathAnimationState.playing = false;
-        pathAnimationState.checkpoints.splice(index, 1);
-        animationEditorState.selectedCheckpointIndex = Math.min(
-            Math.max(animationEditorState.selectedCheckpointIndex, 0),
-            Math.max(0, pathAnimationState.checkpoints.length - 1)
-        );
-        setAnimationEditorStatus(`Deleted checkpoint ${index + 1}.`);
-        syncAnimationEditorFromState();
-    }
-
-    function overwriteCheckpointAtIndex(index) {
-        if (!pathAnimationState.checkpoints.length || index < 0 || index >= pathAnimationState.checkpoints.length) return;
-        const existing = pathAnimationState.checkpoints[index];
-        const duration = existing ? Math.max(0.1, existing.duration || 5) : 5;
-        const checkpoint = buildCheckpointFromCurrentView(duration);
-        pathAnimationState.playing = false;
-        pathAnimationState.checkpoints[index] = checkpoint;
-        setAnimationEditorStatus(`Overwrote checkpoint ${index + 1}.`);
-        syncAnimationEditorFromState();
-        syncAnimationEditorFromState();
-    }
-
-    function renderAnimationCheckpointStrip() {
-        if (!animationCheckpointStrip) return;
-        const checkpoints = pathAnimationState.checkpoints;
-        animationCheckpointStrip.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-
-        checkpoints.forEach((checkpoint, index) => {
-            const item = document.createElement('div');
-            item.className = 'animation-checkpoint-item';
-
-            const hoverActions = document.createElement('div');
-            hoverActions.className = 'animation-checkpoint-hover-actions';
-            const deleteBtn = document.createElement('button');
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'animation-checkpoint-delete-btn';
-            deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>';
-            deleteBtn.setAttribute('aria-label', `Delete checkpoint ${index + 1}`);
-            deleteBtn.title = 'Delete';
-            const overwriteBtn = document.createElement('button');
-            overwriteBtn.type = 'button';
-            overwriteBtn.className = 'animation-checkpoint-overwrite-btn';
-            overwriteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
-            overwriteBtn.setAttribute('aria-label', `Overwrite checkpoint ${index + 1} with current view`);
-            overwriteBtn.title = 'Overwrite';
-            hoverActions.appendChild(deleteBtn);
-            hoverActions.appendChild(overwriteBtn);
-
-            const pill = document.createElement('div');
-            pill.className = 'animation-checkpoint-pill';
-            if (index === animationEditorState.selectedCheckpointIndex) {
-                pill.classList.add('active');
-            }
-            if (pathAnimationState.playing && index === getPathIndex(pathAnimationState.segmentIndex)) {
-                pill.classList.add('playing');
-            }
-            pill.innerHTML = `<span class="animation-checkpoint-pill-label">${index + 1}</span>`;
-            pill.title = `Checkpoint ${index + 1} — click to view`;
-            pill.setAttribute('role', 'button');
-            pill.setAttribute('tabindex', '0');
-            pill.setAttribute('aria-label', `Go to checkpoint ${index + 1}`);
-
-            const activate = () => {
-                animationEditorState.selectedCheckpointIndex = index;
-                goToSelectedCheckpoint();
-            };
-            pill.addEventListener('click', () => activate());
-            pill.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    activate();
-                }
-            });
-
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteCheckpointAtIndex(index);
-            });
-            overwriteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                overwriteCheckpointAtIndex(index);
-            });
-
-            item.appendChild(pill);
-            item.appendChild(hoverActions);
-            fragment.appendChild(item);
-        });
-
-        animationCheckpointStrip.appendChild(fragment);
-    }
-
-    function syncAnimationEditorFromState() {
-        if (!animationEditorState.enabled || !animationEditorPanel) return;
-        syncSelectedCheckpointIndex();
-        const checkpointCount = pathAnimationState.checkpoints.length;
-        const totalSeconds = getTotalPathSeconds();
-        if (animationEditorSummary) {
-            if (!checkpointCount) {
-                animationEditorSummary.textContent = '0';
-            } else {
-                animationEditorSummary.textContent = `${checkpointCount} • ${totalSeconds.toFixed(1)}s`;
-            }
-        }
-        if (animationCaptureCheckpointButton) animationCaptureCheckpointButton.disabled = false;
-        if (animationPlayToggleButton) {
-            const playSvg = animationPlayToggleButton.querySelector('.icon-play');
-            const pauseSvg = animationPlayToggleButton.querySelector('.icon-pause');
-            if (playSvg) playSvg.style.display = pathAnimationState.playing ? 'none' : 'block';
-            if (pauseSvg) pauseSvg.style.display = pathAnimationState.playing ? 'block' : 'none';
-            animationPlayToggleButton.setAttribute('aria-label', pathAnimationState.playing ? 'Pause' : 'Play');
-            animationPlayToggleButton.disabled = checkpointCount < 2;
-        }
-        renderAnimationCheckpointStrip();
-        syncSerializedPathToParameters();
-        window.__cameraAnimationPath = getSerializedCameraPathPayload();
-    }
-
-    function setAnimationEditorOpen(enabled) {
-        if (!animationEditorState.enabled || !animationEditorPanel || !animationEditorToggle) return;
-        animationEditorState.open = !!enabled;
-        animationEditorPanel.classList.toggle('active', animationEditorState.open);
-        animationEditorToggle.classList.toggle('active', animationEditorState.open);
-        animationEditorToggle.setAttribute('aria-pressed', animationEditorState.open ? 'true' : 'false');
-    }
-
-    function setPathAnimationEnabled(enabled) {
-        pathAnimationState.enabled = !!enabled;
-        if (!pathAnimationState.enabled) {
-            pathAnimationState.playing = false;
-            autoRotate = !!parameters.animation.autoRotate;
-            setAnimationEditorStatus('Paused. Capture to add.');
-        } else if (pathAnimationState.checkpoints.length > 1) {
-            autoRotate = false;
-            setAnimationEditorStatus('Ready. Press Play.');
-        } else {
-            pathAnimationState.playing = false;
-            setAnimationEditorStatus('Add 2+ checkpoints to play.');
-        }
-        syncAnimationEditorFromState();
-    }
-
-    function captureCheckpointFromCurrentView() {
-        pathAnimationState.playing = false;
-        const checkpoints = pathAnimationState.checkpoints;
-        const selectedIdx = animationEditorState.selectedCheckpointIndex;
-        const selected = getSelectedPathCheckpoint();
-        const nextDuration = selected ? Math.max(0.1, selected.duration || 5) : 5;
-        const checkpoint = buildCheckpointFromCurrentView(nextDuration);
-        const insertAt = checkpoints.length > 0 && selectedIdx >= 0 && selectedIdx < checkpoints.length
-            ? selectedIdx + 1
-            : checkpoints.length;
-        checkpoints.splice(insertAt, 0, checkpoint);
-        animationEditorState.selectedCheckpointIndex = insertAt;
-        const statusMsg = checkpoints.length === 1
-            ? `Captured checkpoint 1.`
-            : `Captured checkpoint ${insertAt + 1} (inserted after ${selectedIdx + 1}).`;
-        setAnimationEditorStatus(statusMsg);
-        syncAnimationEditorFromState();
-    }
-
-    function goToSelectedCheckpoint(showStatus = true) {
-        if (!pathAnimationState.checkpoints.length) return;
-        pathAnimationState.playing = false;
-        pathAnimationState.segmentElapsed = 0;
-        pathAnimationState.segmentIndex = animationEditorState.selectedCheckpointIndex;
-        applyPathCheckpoint(animationEditorState.selectedCheckpointIndex);
-        if (showStatus) {
-            setAnimationEditorStatus(`Jumped to checkpoint ${animationEditorState.selectedCheckpointIndex + 1}.`);
-        }
-        syncAnimationEditorFromState();
-    }
-
-    function togglePathPlayback() {
-        if (!pathAnimationState.enabled) {
-            setPathAnimationEnabled(true);
-        }
-        if (pathAnimationState.checkpoints.length < 2) {
-            pathAnimationState.playing = false;
-            setAnimationEditorStatus('Add 2+ checkpoints.');
-            syncAnimationEditorFromState();
-            return;
-        }
-        if (pathAnimationState.playing) {
-            pathAnimationState.playing = false;
-            setAnimationEditorStatus('Paused.');
-            syncAnimationEditorFromState();
-            return;
-        }
-        const segmentCount = getPathSegmentCount();
-        if (!segmentCount) {
-            setAnimationEditorStatus('Add checkpoints first.');
-            syncAnimationEditorFromState();
-            return;
-        }
-        manualFocusTargetY = null;
-        if (typeof tapFocusTransition !== 'undefined') {
-            tapFocusTransition.active = false;
-            tapFocusFeedback.active = false;
-            if (tapFocusFeedbackEl) {
-                tapFocusFeedbackEl.style.opacity = '0';
-                tapFocusFeedbackEl.style.display = 'none';
-            }
-        }
-        ignoreNextPauseUntil = performance.now() + 150;
-        autoRotate = false;
-        isAnimatingToNorth = false;
-        if (!pathAnimationState.loop && animationEditorState.selectedCheckpointIndex >= pathAnimationState.checkpoints.length - 1) {
-            animationEditorState.selectedCheckpointIndex = 0;
-        }
-        pathAnimationState.segmentIndex = pathAnimationState.loop
-            ? getPathIndex(animationEditorState.selectedCheckpointIndex)
-            : Math.min(animationEditorState.selectedCheckpointIndex, pathAnimationState.checkpoints.length - 2);
-        pathAnimationState.segmentElapsed = 0;
-        pathAnimationState.playing = true;
-        applyPathPose(pathAnimationState.segmentIndex, 0);
-        setAnimationEditorStatus('Playing.');
-        syncAnimationEditorFromState();
-    }
-
-    function buildCameraPathExportSnippet() {
-        const payload = getSerializedCameraPathPayload();
-        const jsonText = JSON.stringify(payload, null, 2);
-        return {
-            payload,
-            jsonText,
-            snippet: `path: ${jsonText}`
-        };
-    }
-
-    async function exportCameraPathToClipboard() {
-        const { payload, snippet } = buildCameraPathExportSnippet();
-        animationEditorState.lastExportJson = snippet;
-        window.__cameraAnimationExport = snippet;
-        try {
-            const copied = await copyTextToClipboard(snippet);
-            if (copied) {
-                setAnimationEditorStatus(`Copied ${payload.checkpoints.length} checkpoints (${getTotalPathSeconds().toFixed(2)}s total).`);
-                return;
-            }
-        } catch (error) {
-            // Fall through to prompt fallback.
-        }
-        try {
-            window.prompt('Copy camera path config', snippet);
-            setAnimationEditorStatus(`Path JSON ready (${payload.checkpoints.length} checkpoints).`);
-        } catch (error) {
-            setAnimationEditorStatus('Unable to copy camera path JSON automatically.');
-        }
-    }
-
-    function initializeAnimationEditor() {
-        if (!animationEditorState.enabled) {
-            if (animationEditorToggleWrap) animationEditorToggleWrap.style.display = 'none';
-            if (animationEditorPanel) animationEditorPanel.style.display = 'none';
-            return;
-        }
-        if (!animationEditorPanel || !animationEditorToggle) return;
-        pathAnimationState.loop = true;
-        pathAnimationState.speed = 1;
-        setAnimationEditorOpen(!!(parameters.animation.editor && parameters.animation.editor.defaultOpen));
-        setAnimationEditorStatus('Capture to add. Click pill to view. Hover pill for Delete/Overwrite.');
-        syncAnimationEditorFromState();
-        window.__syncAnimationEditorUI = syncAnimationEditorFromState;
-        window.__cameraPathDebug = {
-            getState: () => ({
-                enabled: pathAnimationState.enabled,
-                loop: pathAnimationState.loop,
-                speed: pathAnimationState.speed,
-                playing: pathAnimationState.playing,
-                selectedCheckpointIndex: animationEditorState.selectedCheckpointIndex,
-                checkpointCount: pathAnimationState.checkpoints.length,
-                segmentIndex: pathAnimationState.segmentIndex,
-                segmentElapsed: pathAnimationState.segmentElapsed
-            }),
-            getCamera: () => ({
-                position: {
-                    x: camera.position.x,
-                    y: camera.position.y,
-                    z: camera.position.z
-                },
-                target: {
-                    x: controls.target.x,
-                    y: controls.target.y,
-                    z: controls.target.z
-                }
-            }),
-            getSerializedPath: () => getSerializedCameraPathPayload()
-        };
-    }
 
     function setSplatEditorOpen(open) {
         if (!splatEditorState.enabled || !splatEditorPanel || !splatEditorToggle) return;
@@ -4954,16 +4201,11 @@
                 controlsEnabled: controls.enabled,
                 controlsRotateEnabled: controls.enableRotate,
                 autoRotate,
-                pathEnabled: pathAnimationState.enabled,
-                pathPlaying: pathAnimationState.playing,
-                pathLoop: pathAnimationState.loop,
-                pathSpeed: pathAnimationState.speed,
-                pathSegmentIndex: pathAnimationState.segmentIndex,
-                pathSegmentElapsed: pathAnimationState.segmentElapsed
+                pathPlaying: window.__pathAnimation ? window.__pathAnimation.getState().playing : false
             };
             autoRotate = false;
             isAnimatingToNorth = false;
-            pathAnimationState.playing = false;
+            if (window.__pathAnimation) window.__pathAnimation.pause();
             if (lotEditState.selectedTapDot) {
                 syncLotEditorInputsFromSelection();
             } else if (!lotEditState.selectedVertexName || !borderDots[lotEditState.selectedVertexName]) {
@@ -4987,12 +4229,6 @@
             controls.enabled = snapshot.controlsEnabled;
             controls.enableRotate = snapshot.controlsRotateEnabled;
             autoRotate = snapshot.autoRotate;
-            pathAnimationState.enabled = snapshot.pathEnabled ?? pathAnimationState.enabled;
-            pathAnimationState.playing = snapshot.pathPlaying ?? false;
-            pathAnimationState.loop = snapshot.pathLoop ?? pathAnimationState.loop;
-            pathAnimationState.speed = Number.isFinite(snapshot.pathSpeed) ? snapshot.pathSpeed : pathAnimationState.speed;
-            pathAnimationState.segmentIndex = Number.isFinite(snapshot.pathSegmentIndex) ? snapshot.pathSegmentIndex : 0;
-            pathAnimationState.segmentElapsed = Number.isFinite(snapshot.pathSegmentElapsed) ? snapshot.pathSegmentElapsed : 0;
             controls.update();
         } else {
             controls.enableRotate = true;
@@ -5000,7 +4236,6 @@
         }
         setLotEditorStatus('Enable mode, then drag vertices or tap dots to adjust positions.');
         refreshBorderVisualState();
-        syncAnimationEditorFromState();
     }
 
     function updateSelectedCoordinate(axis, value) {
@@ -5152,37 +4387,15 @@
         });
     }
 
-    if (animationEditorToggle) {
-        animationEditorToggle.addEventListener('click', () => {
-            setAnimationEditorOpen(!animationEditorState.open);
-        });
-    }
-    if (animationEditorCloseButton) {
-        animationEditorCloseButton.addEventListener('click', () => {
-            setAnimationEditorOpen(false);
-        });
-    }
     window.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
         if (splatEditorState.open) {
             setSplatEditorOpen(false);
             return;
         }
-        if (!animationEditorState.open) return;
-        setAnimationEditorOpen(false);
     });
-    if (animationCaptureCheckpointButton) {
-        animationCaptureCheckpointButton.addEventListener('click', captureCheckpointFromCurrentView);
-    }
-    if (animationPlayToggleButton) {
-        animationPlayToggleButton.addEventListener('click', togglePathPlayback);
-    }
-    if (animationExportButton) {
-        animationExportButton.addEventListener('click', exportCameraPathToClipboard);
-    }
 
     syncLotEditorInputsFromSelection();
-    initializeAnimationEditor();
     initializeSplatEditor();
 
     // Original base spacing and sizes:
@@ -5337,19 +4550,14 @@
         }
     });
 
-    // Add click listener for compass button (dual purpose: restart shared path if available, else existing behavior)
+    // Add click listener for compass button (dual purpose: north face OR animation start)
     compassButton.addEventListener('click', (event) => {
-        if (window.__pathAnimation) {
-            const state = window.__pathAnimation.getState();
-            const checkpoints = state.pathState && state.pathState.checkpoints ? state.pathState.checkpoints : [];
-            if (checkpoints.length >= 2) {
-                window.__pathAnimation.goToAnimationStart();
-                return;
-            }
-        }
         const mode = (parameters.compass.northButtonMode || 'north').toLowerCase();
         if (mode === 'animationstart') {
-            goToAnimationStart();
+            if (window.__pathAnimation) {
+                const focus = getPrimaryFocusPoint();
+                window.__pathAnimation.goToAnimationStart(focus);
+            }
         } else {
             animateCameraToNorth();
         }
@@ -5620,7 +4828,9 @@
 
     // Initialize layout mode
     applyLayoutMode();
+
     
     </script>
+<script type="module" src="../shared/properties-nav.mjs"></script>
 </body>
 </html>

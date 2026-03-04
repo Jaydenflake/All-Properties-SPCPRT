@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Properties — 3D Property Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1216;
+      --surface: #1a1e26;
+      --surface-hover: #22272f;
+      --border: rgba(255,255,255,0.08);
+      --text: #e8eaed;
+      --text-muted: #9aa0a6;
+      --accent: #bf281b;
+      --accent-hover: #d43a2b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3rem;
+    }
+    header {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.25rem 0;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+    }
+    .prop-btn {
+      display: block;
+      width: 100%;
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      text-align: left;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    }
+    .prop-btn:hover {
+      background: var(--surface-hover);
+      border-color: rgba(255,255,255,0.14);
+      transform: translateY(-1px);
+    }
+    .prop-btn:active {
+      transform: translateY(0);
+    }
+    .prop-btn .name { display: block; }
+    .prop-btn .meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    @media (max-width: 480px) {
+      .grid { grid-template-columns: 1fr; }
+      .page { padding: 1.5rem 1rem 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Properties</h1>
+      <p class="subtitle">Select a property to view in 3D</p>
+    </header>
+    <div class="grid" id="propertyGrid"></div>
+  </div>
+  <script>
+    const properties = [
+      { file: 'index(46th-Street-06-24-24).html', name: '46th Street' },
+      { file: 'index(Columbia-Eden-05-21-24).html', name: 'Columbia Eden' },
+      { file: 'index(Copper-Rock-02-15-26).html', name: 'Copper Rock' },
+      { file: 'index(Cromwell-Island-08-31-25).html', name: 'Cromwell Island' },
+      { file: 'index(Deer-Knoll-10-08-24).html', name: 'Deer Knoll' },
+      { file: 'index(Dolan-Road-01-24-25).html', name: 'Dolan Road' },
+      { file: 'index(Edgewood-Farm-12-10-25).html', name: 'Edgewood Farm' },
+      { file: 'index(Hart-Bench-Ranch-06-08-25).html', name: 'Hart Bench Ranch' },
+      { file: 'index(Hill-Street-09-11-24).html', name: 'Hill Street' },
+      { file: 'index(Jones-Creek-09-16-24).html', name: 'Jones Creek' },
+      { file: 'index(Mt-Pleasant-06-23-24).html', name: 'Mt Pleasant' },
+      { file: 'index(Park-Road-08-31-24).html', name: 'Park Road' },
+      { file: 'index(Red-Arrow-Ranch-02-06-26).html', name: 'Red Arrow Ranch' },
+      { file: 'index(Resort-Drive-10-15-24).html', name: 'Resort Drive' },
+      { file: 'index(Six-S-Ranch-12-23-24).html', name: 'Six S Ranch' },
+      { file: 'index(Three-Rivers-05-08-25).html', name: 'Three Rivers' },
+      { file: 'index(TL400-09-29-24).html', name: 'TL400' },
+      { file: 'index(Wolf-Creek-01-17-25).html', name: 'Wolf Creek' }
+    ];
+    const base = 'indexes/';
+    const grid = document.getElementById('propertyGrid');
+    properties.forEach((p) => {
+      const a = document.createElement('a');
+      a.className = 'prop-btn';
+      a.href = base + p.file;
+      a.innerHTML = `<span class="name">${p.name}</span><span class="meta">View 3D tour</span>`;
+      grid.appendChild(a);
+    });
+  </script>
+</body>
+</html>
