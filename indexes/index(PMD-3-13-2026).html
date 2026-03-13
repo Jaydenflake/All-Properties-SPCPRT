@@ -1719,7 +1719,7 @@
             responsiveness: 1.4
         },
         developerMode: false,  // Set this to true to activate developer mode
-        developerToolsVisible: false,  // Editor buttons (splat, lot, animation) in top right
+        developerToolsVisible: true,  // Editor buttons (splat, lot, animation) in top right
         splatEditor: {
             enabled: true,
             defaultOpen: false
@@ -5157,6 +5157,17 @@
     }
 
     document.addEventListener('fullscreenchange', updateFullscreenIcon);
+
+    // Home model editor (GLB/OBJ import + transform UI)
+    import('../shared/obj-home-editor.mjs').then(({ initObjHomeEditor }) => {
+        window.__homeEditor = initObjHomeEditor({
+            scene,
+            camera,
+            controls,
+            renderer,
+            propertyLabel: 'Powder-Mountain-Development'
+        });
+    }).catch(err => console.warn('Home model editor failed to load', err));
 
     window.isTapdotPopupOpen = false;
     window.tapdotCarouselPhotos = [];
