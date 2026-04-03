@@ -725,6 +725,9 @@ export function initObjHomeEditor(options = {}) {
         <button id="objHomeCopyBtn" type="button">Copy JSON</button>
         <button id="objHomeRemoveBtn" type="button" class="danger">Remove</button>
       </div>
+      <div class="obj-home-actions" style="margin-top:6px;">
+        <button id="objHomeAlignBtn" type="button" style="flex:1 1 100%;background:rgba(34,139,34,0.35);border-color:rgba(34,139,34,0.5);">Align Model</button>
+      </div>
     </div>
   `;
   document.body.appendChild(ui.panel);
@@ -853,6 +856,18 @@ export function initObjHomeEditor(options = {}) {
     if (!state.modelGroup) return;
     if (!confirm('Remove the home model from the scene?')) return;
     removeModel();
+  });
+
+  const alignBtn = ui.panel.querySelector('#objHomeAlignBtn');
+  alignBtn.addEventListener('click', () => {
+    const obj = state.modelGroup;
+    if (!obj) { setStatus('Load a model first.'); return; }
+    obj.position.set(-0.144, -0.370, -0.395);
+    obj.rotation.set(MathUtils.degToRad(-177.7), MathUtils.degToRad(-57), MathUtils.degToRad(-177.3));
+    obj.scale.setScalar(0.008);
+    syncInputsFromObject();
+    attachGizmoIfNeeded();
+    setStatus('Aligned model to saved coordinates.');
   });
 
   // Initial UI state

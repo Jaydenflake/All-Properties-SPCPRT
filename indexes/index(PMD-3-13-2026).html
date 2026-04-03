@@ -1231,6 +1231,41 @@
         .splat-editor-actions {
             margin-top: 8px;
         }
+        .glb-editor-toggle-wrap {
+            margin: 0;
+        }
+        .glb-editor-panel {
+            top: 66px;
+            width: 240px;
+            max-width: min(240px, calc(100vw - 24px));
+        }
+        .glb-editor-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .glb-editor-action-btn {
+            width: 100%;
+            padding: 7px 12px;
+            font-size: 11px;
+            font-weight: 500;
+            font-family: inherit;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .glb-editor-action-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+        .glb-editor-action-btn:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
         .lot-midpoint-layer {
             position: absolute;
             inset: 0;
@@ -1322,6 +1357,11 @@
             </svg>
         </button>
     </div>
+    <div class="glb-editor-toggle-wrap" id="glbEditorToggleWrap">
+        <button id="glbEditorToggle" class="lot-editor-toggle animation-editor-toggle-icon-only" type="button" aria-pressed="false" aria-label="Toggle GLB model editor" title="Load & clip GLB model">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        </button>
+    </div>
     <div class="animation-editor-toggle-wrap" id="animationEditorToggleWrap">
         <button id="animationEditorToggle" class="lot-editor-toggle animation-editor-toggle-icon-only" type="button" aria-pressed="false" aria-label="Toggle camera path editor">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1396,6 +1436,37 @@
             <button id="splatExportButton" type="button" class="lot-editor-action-btn animation-editor-btn-icon" aria-label="Copy splat JSON" title="Copy splat config JSON">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             </button>
+        </div>
+    </div>
+
+    <div id="glbEditorPanel" class="lot-editor-panel animation-editor-panel splat-editor-panel glb-editor-panel" aria-live="polite">
+        <div class="animation-editor-header">
+            <div class="lot-editor-title">Polygon Clipper</div>
+            <button id="glbEditorCloseButton" class="animation-editor-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div id="glbEditorStatus" class="lot-editor-status animation-editor-status-compact">Draw a polygon or enter box coordinates.</div>
+        <div style="border-bottom:1px solid rgba(255,255,255,0.15);padding-bottom:6px;margin-bottom:6px;">
+            <div style="font-size:11px;opacity:0.6;margin-bottom:4px;">Bounding Box</div>
+            <div class="lot-editor-grid" style="grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px;">
+                <div class="lot-editor-field"><label for="boxMinX">Min X</label><input id="boxMinX" type="number" step="0.01" value="-0.5"></div>
+                <div class="lot-editor-field"><label for="boxMaxX">Max X</label><input id="boxMaxX" type="number" step="0.01" value="0.5"></div>
+                <div class="lot-editor-field"><label for="boxMinZ">Min Z</label><input id="boxMinZ" type="number" step="0.01" value="-0.5"></div>
+                <div class="lot-editor-field"><label for="boxMaxZ">Max Z</label><input id="boxMaxZ" type="number" step="0.01" value="0.5"></div>
+            </div>
+            <button id="boxApplyButton" type="button" class="glb-editor-action-btn" style="width:100%">Apply Box</button>
+        </div>
+        <div style="border-bottom:1px solid rgba(255,255,255,0.15);padding-bottom:6px;margin-bottom:6px;">
+            <div style="font-size:11px;opacity:0.6;margin-bottom:4px;">Draw Polygon</div>
+            <div class="glb-editor-actions">
+                <button id="polyDrawButton" type="button" class="glb-editor-action-btn">Draw Polygon</button>
+                <button id="polyUndoButton" type="button" class="glb-editor-action-btn" disabled>Undo Point</button>
+                <button id="polyCloseButton" type="button" class="glb-editor-action-btn" disabled>Close Polygon</button>
+            </div>
+        </div>
+        <div class="glb-editor-actions">
+            <button id="polyGenColumnButton" type="button" class="glb-editor-action-btn" disabled>Generate Column</button>
+            <button id="clipHideButton" type="button" class="glb-editor-action-btn" disabled>Hide Gaussians</button>
+            <button id="clipShowButton" type="button" class="glb-editor-action-btn" style="display:none">Show All</button>
         </div>
     </div>
 
@@ -1487,7 +1558,7 @@
     }
     </script>
     <script type="module">
-    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector2, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane } from 'three';
+    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector2, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane, LineBasicMaterial, LineSegments, BufferGeometry, Float32BufferAttribute } from 'three';
 
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { LumaSplatsThree } from '@lumaai/luma-web';
@@ -1981,6 +2052,54 @@
         holeSplat.scale.setScalar(scale);
     }
 
+    const POLY_MAX = 32;
+    const columnClipUniforms = {
+        clipEnabled: { value: 0.0 },
+        polyCount: { value: 0.0 },
+        polyVerts: { value: Array.from({ length: POLY_MAX }, () => new Vector2(0, 0)) }
+    };
+
+    function applyColumnClip(splat) {
+        if (!splat || !splat.material) return;
+        splat.material.onBeforeCompile = (shader) => {
+            shader.uniforms.clipEnabled = columnClipUniforms.clipEnabled;
+            shader.uniforms.polyCount = columnClipUniforms.polyCount;
+            shader.uniforms.polyVerts = columnClipUniforms.polyVerts;
+
+            shader.vertexShader = `
+                uniform float clipEnabled;
+                uniform float polyCount;
+                uniform vec2 polyVerts[${POLY_MAX}];
+                bool pointInPoly(vec2 p) {
+                    int n = int(polyCount);
+                    bool inside = false;
+                    for (int i = 0; i < ${POLY_MAX}; i++) {
+                        if (i >= n) break;
+                        int j = i == 0 ? n - 1 : i - 1;
+                        vec2 vi = polyVerts[i];
+                        vec2 vj = polyVerts[j];
+                        if (((vi.y > p.y) != (vj.y > p.y)) &&
+                            (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x)) {
+                            inside = !inside;
+                        }
+                    }
+                    return inside;
+                }
+                ${shader.vertexShader}
+            `;
+
+            shader.vertexShader = shader.vertexShader.replace(
+                /vec3 c=vec3\(a,b\.x\);/,
+                `vec3 c=vec3(a,b.x);
+                vec3 wc = (modelMatrix * vec4(c, 1.0)).xyz;
+                if (clipEnabled > 0.5 && pointInPoly(wc.xz)) {
+                    gl_Position = vec4(0., 0., 2., 1.);
+                    return;
+                }`
+            );
+        };
+    }
+
     function createHoleSplat(holeConfig) {
         const holeSplat = new LumaSplatsThree({
             source: holeConfig.source,
@@ -1991,6 +2110,7 @@
             holeSplat.material.depthTest = true;
         }
         holeSplat.renderOrder = 999;
+        applyColumnClip(holeSplat);
         applyHoleSplatTransform(holeSplat, holeConfig);
         holeSplat.visible = false;
         scene.add(holeSplat);
@@ -4941,6 +5061,10 @@
     }
     window.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
+        if (glbEditorOpen) {
+            setGlbEditorOpen(false);
+            return;
+        }
         if (splatEditorState.open) {
             setSplatEditorOpen(false);
             return;
@@ -4961,6 +5085,290 @@
     syncLotEditorInputsFromSelection();
     initializeAnimationEditor();
     initializeSplatEditor();
+
+    // ── Polygon Column Clipper ─────────────────────────────────────────
+    const glbEditorToggle = document.getElementById('glbEditorToggle');
+    const glbEditorPanel = document.getElementById('glbEditorPanel');
+    const glbEditorCloseButton = document.getElementById('glbEditorCloseButton');
+    const glbEditorStatus = document.getElementById('glbEditorStatus');
+    const boxMinXInput = document.getElementById('boxMinX');
+    const boxMaxXInput = document.getElementById('boxMaxX');
+    const boxMinZInput = document.getElementById('boxMinZ');
+    const boxMaxZInput = document.getElementById('boxMaxZ');
+    const boxApplyButton = document.getElementById('boxApplyButton');
+    const polyDrawButton = document.getElementById('polyDrawButton');
+    const polyUndoButton = document.getElementById('polyUndoButton');
+    const polyCloseButton = document.getElementById('polyCloseButton');
+    const polyGenColumnButton = document.getElementById('polyGenColumnButton');
+    const clipHideButton = document.getElementById('clipHideButton');
+    const clipShowButton = document.getElementById('clipShowButton');
+
+    let glbEditorOpen = false;
+    let polyDrawing = false;
+    let polyClosed = false;
+    let columnGenerated = false;
+    let columnClipActive = false;
+    const polyVertices = [];
+    const polyMarkers = [];
+    const polyLineSegments = [];
+    const columnWallSegments = [];
+    const polyRaycaster = new Raycaster();
+    const polyNDC = new Vector2();
+    const polyPlane = new Plane(new Vector3(0, 1, 0), 0);
+    const polyLineMaterial = new LineBasicMaterial({ color: 0x00ffff, depthTest: false, transparent: true, opacity: 0.9 });
+    const polyMarkerMaterial = new MeshBasicMaterial({ color: 0x00ffff, depthTest: false, transparent: true, opacity: 0.9 });
+
+    function setGlbEditorOpen(open) {
+        glbEditorOpen = !!open;
+        if (glbEditorPanel) glbEditorPanel.classList.toggle('active', glbEditorOpen);
+        if (glbEditorToggle) {
+            glbEditorToggle.classList.toggle('active', glbEditorOpen);
+            glbEditorToggle.setAttribute('aria-pressed', glbEditorOpen ? 'true' : 'false');
+        }
+        if (!glbEditorOpen && polyDrawing) stopDrawing();
+    }
+
+    function updatePolyButtons() {
+        const n = polyVertices.length;
+        const locked = polyClosed && !columnClipActive;
+        if (boxApplyButton) boxApplyButton.disabled = locked;
+        if (polyUndoButton) polyUndoButton.disabled = n === 0 || polyClosed;
+        if (polyCloseButton) polyCloseButton.disabled = n < 3 || polyClosed;
+        if (polyGenColumnButton) {
+            polyGenColumnButton.disabled = !polyClosed || columnGenerated;
+            polyGenColumnButton.style.display = columnClipActive ? 'none' : '';
+        }
+        if (clipHideButton) {
+            clipHideButton.disabled = !columnGenerated || columnClipActive;
+            clipHideButton.style.display = columnClipActive ? 'none' : '';
+        }
+        if (clipShowButton) clipShowButton.style.display = columnClipActive ? '' : 'none';
+        if (polyDrawButton) {
+            polyDrawButton.textContent = polyDrawing ? 'Stop Drawing' : 'Draw Polygon';
+            polyDrawButton.disabled = locked;
+        }
+    }
+
+    function addVertexFromCoords(worldX, worldZ, clipX, clipZ) {
+        const worldPos = new Vector3(worldX, 0, worldZ);
+        polyVertices.push({ world: worldPos, clipXZ: new Vector2(clipX, clipZ) });
+
+        const markerGeo = new SphereGeometry(0.008, 8, 8);
+        const marker = new Mesh(markerGeo, polyMarkerMaterial);
+        marker.position.copy(worldPos);
+        marker.renderOrder = 10001;
+        scene.add(marker);
+        polyMarkers.push(marker);
+
+        if (polyVertices.length >= 2) {
+            const prev = polyVertices[polyVertices.length - 2].world;
+            addLineSegment(prev, worldPos);
+        }
+    }
+
+    function applyBox() {
+        const minX = parseFloat(boxMinXInput?.value);
+        const maxX = parseFloat(boxMaxXInput?.value);
+        const minZ = parseFloat(boxMinZInput?.value);
+        const maxZ = parseFloat(boxMaxZInput?.value);
+        if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+            if (glbEditorStatus) glbEditorStatus.textContent = 'Enter valid numbers for all four bounds.';
+            return;
+        }
+        if (minX >= maxX || minZ >= maxZ) {
+            if (glbEditorStatus) glbEditorStatus.textContent = 'Min must be less than Max.';
+            return;
+        }
+        clearPolygon();
+        addVertexFromCoords(minX, minZ, minX, minZ);
+        addVertexFromCoords(maxX, minZ, maxX, minZ);
+        addVertexFromCoords(maxX, maxZ, maxX, maxZ);
+        addVertexFromCoords(minX, maxZ, minX, maxZ);
+        addLineSegment(polyVertices[3].world, polyVertices[0].world);
+        polyClosed = true;
+        if (glbEditorStatus) glbEditorStatus.textContent = `Box polygon (4 vertices). Hit Generate Column.`;
+        updatePolyButtons();
+    }
+
+    function startDrawing() {
+        clearPolygon();
+        polyDrawing = true;
+        renderer.domElement.style.cursor = 'crosshair';
+        if (glbEditorStatus) glbEditorStatus.textContent = 'Click to place vertices. Need at least 3.';
+        updatePolyButtons();
+    }
+
+    function stopDrawing() {
+        polyDrawing = false;
+        renderer.domElement.style.cursor = '';
+        updatePolyButtons();
+    }
+
+    function addLineSegment(from, to) {
+        const geo = new BufferGeometry();
+        geo.setAttribute('position', new Float32BufferAttribute([from.x, from.y, from.z, to.x, to.y, to.z], 3));
+        const line = new LineSegments(geo, polyLineMaterial);
+        line.renderOrder = 10000;
+        scene.add(line);
+        polyLineSegments.push(line);
+        return line;
+    }
+
+    function placeVertex(event) {
+        if (!polyDrawing || polyClosed) return;
+
+        const worldHit = pickWorldPointFromTap(event);
+        if (!worldHit) {
+            if (glbEditorStatus) glbEditorStatus.textContent = 'No splat under cursor — click on visible terrain.';
+            return;
+        }
+
+        polyVertices.push({ world: worldHit.clone(), clipXZ: new Vector2(worldHit.x, worldHit.z) });
+
+        const markerGeo = new SphereGeometry(0.008, 8, 8);
+        const marker = new Mesh(markerGeo, polyMarkerMaterial);
+        marker.position.copy(worldHit);
+        marker.renderOrder = 10001;
+        scene.add(marker);
+        polyMarkers.push(marker);
+
+        if (polyVertices.length >= 2) {
+            const prev = polyVertices[polyVertices.length - 2].world;
+            addLineSegment(prev, worldHit);
+        }
+
+        if (glbEditorStatus) glbEditorStatus.textContent = `${polyVertices.length} point${polyVertices.length > 1 ? 's' : ''} placed. ${polyVertices.length < 3 ? 'Need at least 3.' : 'Close when ready.'}`;
+        updatePolyButtons();
+    }
+
+    function undoLastVertex() {
+        if (polyVertices.length === 0 || polyClosed) return;
+        polyVertices.pop();
+        const marker = polyMarkers.pop();
+        if (marker) { scene.remove(marker); marker.geometry?.dispose(); }
+        if (polyVertices.length >= 1) {
+            const line = polyLineSegments.pop();
+            if (line) { scene.remove(line); line.geometry?.dispose(); }
+        }
+        if (glbEditorStatus) glbEditorStatus.textContent = polyVertices.length > 0
+            ? `${polyVertices.length} point${polyVertices.length > 1 ? 's' : ''} placed.`
+            : 'Click to place vertices. Need at least 3.';
+        updatePolyButtons();
+    }
+
+    function closePolygon() {
+        if (polyVertices.length < 3 || polyClosed) return;
+        const first = polyVertices[0].world;
+        const last = polyVertices[polyVertices.length - 1].world;
+        addLineSegment(last, first);
+        polyClosed = true;
+        stopDrawing();
+        if (glbEditorStatus) glbEditorStatus.textContent = `Polygon closed (${polyVertices.length} vertices). Hit Generate Column.`;
+        updatePolyButtons();
+    }
+
+    function removeColumnVisual() {
+        columnWallSegments.forEach(l => { scene.remove(l); l.geometry?.dispose(); });
+        columnWallSegments.length = 0;
+        columnGenerated = false;
+    }
+
+    function generateColumnVisual() {
+        if (!polyClosed || polyVertices.length < 3) return;
+        removeColumnVisual();
+
+        const wallHeight = 200;
+        const wallMat = new LineBasicMaterial({ color: 0x00ff88, depthTest: false, transparent: true, opacity: 0.7 });
+        const n = polyVertices.length;
+
+        for (let i = 0; i < n; i++) {
+            const a = polyVertices[i].world;
+            const b = polyVertices[(i + 1) % n].world;
+            const positions = [
+                a.x, a.y - wallHeight, a.z,   a.x, a.y + wallHeight, a.z,
+                b.x, b.y - wallHeight, b.z,   b.x, b.y + wallHeight, b.z,
+                a.x, a.y - wallHeight, a.z,   b.x, b.y - wallHeight, b.z,
+                a.x, a.y + wallHeight, a.z,   b.x, b.y + wallHeight, b.z,
+            ];
+            const geo = new BufferGeometry();
+            geo.setAttribute('position', new Float32BufferAttribute(positions, 3));
+            const wall = new LineSegments(geo, wallMat);
+            wall.renderOrder = 10000;
+            scene.add(wall);
+            columnWallSegments.push(wall);
+        }
+
+        for (let i = 0; i < n; i++) {
+            const v = polyVertices[i].world;
+            const geo = new BufferGeometry();
+            geo.setAttribute('position', new Float32BufferAttribute([
+                v.x, v.y - wallHeight, v.z,   v.x, v.y + wallHeight, v.z
+            ], 3));
+            const vert = new LineSegments(geo, wallMat);
+            vert.renderOrder = 10000;
+            scene.add(vert);
+            columnWallSegments.push(vert);
+        }
+
+        columnGenerated = true;
+        if (glbEditorStatus) glbEditorStatus.textContent = `Column generated. Hit Hide Gaussians to clip.`;
+        updatePolyButtons();
+    }
+
+    function clearPolygon() {
+        polyMarkers.forEach(m => { scene.remove(m); m.geometry?.dispose(); });
+        polyMarkers.length = 0;
+        polyLineSegments.forEach(l => { scene.remove(l); l.geometry?.dispose(); });
+        polyLineSegments.length = 0;
+        polyVertices.length = 0;
+        polyClosed = false;
+        removeColumnVisual();
+    }
+
+    function applyColumnHide() {
+        if (!polyClosed || polyVertices.length < 3) return;
+        const n = Math.min(polyVertices.length, POLY_MAX);
+        for (let i = 0; i < n; i++) {
+            columnClipUniforms.polyVerts.value[i].copy(polyVertices[i].clipXZ);
+        }
+        columnClipUniforms.polyCount.value = n;
+        columnClipUniforms.clipEnabled.value = 1.0;
+        const activeSplat = holeSplats[activeHoleIndex];
+        if (activeSplat && activeSplat.material) activeSplat.material.needsUpdate = true;
+        columnClipActive = true;
+        if (glbEditorStatus) glbEditorStatus.textContent = `Clipping inside ${n}-vertex polygon.`;
+        updatePolyButtons();
+    }
+
+    function applyColumnShow() {
+        columnClipUniforms.clipEnabled.value = 0.0;
+        const activeSplat = holeSplats[activeHoleIndex];
+        if (activeSplat && activeSplat.material) activeSplat.material.needsUpdate = true;
+        columnClipActive = false;
+        clearPolygon();
+        if (glbEditorStatus) glbEditorStatus.textContent = 'All Gaussians restored. Draw a new polygon.';
+        updatePolyButtons();
+    }
+
+    renderer.domElement.addEventListener('pointerdown', (event) => {
+        if (!polyDrawing || polyClosed || event.button !== 0) return;
+        if (event.target !== renderer.domElement) return;
+        event.preventDefault();
+        event.stopPropagation();
+        placeVertex(event);
+    }, { passive: false, capture: true });
+
+    if (glbEditorToggle) glbEditorToggle.addEventListener('click', () => setGlbEditorOpen(!glbEditorOpen));
+    if (glbEditorCloseButton) glbEditorCloseButton.addEventListener('click', () => setGlbEditorOpen(false));
+    if (boxApplyButton) boxApplyButton.addEventListener('click', applyBox);
+    if (polyDrawButton) polyDrawButton.addEventListener('click', () => { polyDrawing ? stopDrawing() : startDrawing(); });
+    if (polyUndoButton) polyUndoButton.addEventListener('click', undoLastVertex);
+    if (polyCloseButton) polyCloseButton.addEventListener('click', closePolygon);
+    if (polyGenColumnButton) polyGenColumnButton.addEventListener('click', generateColumnVisual);
+    if (clipHideButton) clipHideButton.addEventListener('click', applyColumnHide);
+    if (clipShowButton) clipShowButton.addEventListener('click', applyColumnShow);
+    updatePolyButtons();
+    // ── End Polygon Column Clipper ──────────────────────────────────────
 
     // Original base spacing and sizes:
     const baseMenuLeft = 20;
