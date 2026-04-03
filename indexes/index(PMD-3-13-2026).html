@@ -1468,6 +1468,9 @@
             <button id="clipHideButton" type="button" class="glb-editor-action-btn" disabled>Hide Gaussians</button>
             <button id="clipShowButton" type="button" class="glb-editor-action-btn" style="display:none">Show All</button>
         </div>
+        <div class="glb-editor-actions" style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.15);padding-top:8px;">
+            <button id="exportRenderingBtn" type="button" class="glb-editor-action-btn" style="background:rgba(34,139,34,0.35);width:100%">Export Rendering Config</button>
+        </div>
     </div>
 
     <div id="lotEditorPanel" class="lot-editor-panel animation-editor-panel" aria-live="polite">
@@ -2052,38 +2055,49 @@
         holeSplat.scale.setScalar(scale);
     }
 
-    const POLY_MAX = 32;
+    const VERTS_MAX = 256;
+    const GROUPS_MAX = 8;
     const columnClipUniforms = {
         clipEnabled: { value: 0.0 },
-        polyCount: { value: 0.0 },
-        polyVerts: { value: Array.from({ length: POLY_MAX }, () => new Vector2(0, 0)) }
+        polyGroupCount: { value: 0.0 },
+        polySizes: { value: new Float32Array(GROUPS_MAX) },
+        polyVerts: { value: Array.from({ length: VERTS_MAX }, () => new Vector2(0, 0)) }
     };
 
     function applyColumnClip(splat) {
         if (!splat || !splat.material) return;
         splat.material.onBeforeCompile = (shader) => {
             shader.uniforms.clipEnabled = columnClipUniforms.clipEnabled;
-            shader.uniforms.polyCount = columnClipUniforms.polyCount;
+            shader.uniforms.polyGroupCount = columnClipUniforms.polyGroupCount;
+            shader.uniforms.polySizes = columnClipUniforms.polySizes;
             shader.uniforms.polyVerts = columnClipUniforms.polyVerts;
 
             shader.vertexShader = `
                 uniform float clipEnabled;
-                uniform float polyCount;
-                uniform vec2 polyVerts[${POLY_MAX}];
-                bool pointInPoly(vec2 p) {
-                    int n = int(polyCount);
-                    bool inside = false;
-                    for (int i = 0; i < ${POLY_MAX}; i++) {
-                        if (i >= n) break;
-                        int j = i == 0 ? n - 1 : i - 1;
-                        vec2 vi = polyVerts[i];
-                        vec2 vj = polyVerts[j];
-                        if (((vi.y > p.y) != (vj.y > p.y)) &&
-                            (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x)) {
-                            inside = !inside;
+                uniform float polyGroupCount;
+                uniform float polySizes[${GROUPS_MAX}];
+                uniform vec2 polyVerts[${VERTS_MAX}];
+                bool insideAnyPoly(vec2 p) {
+                    int numGroups = int(polyGroupCount);
+                    int offset = 0;
+                    for (int g = 0; g < ${GROUPS_MAX}; g++) {
+                        if (g >= numGroups) break;
+                        int n = int(polySizes[g]);
+                        bool inside = false;
+                        for (int i = 0; i < ${VERTS_MAX}; i++) {
+                            if (i >= n) break;
+                            int j = i == 0 ? n - 1 : i - 1;
+                            vec2 vi = polyVerts[offset + i];
+                            vec2 vj = polyVerts[offset + j];
+                            if (((vi.y > p.y) != (vj.y > p.y)) &&
+                                (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x)) {
+                                inside = !inside;
+                            }
                         }
+                        if (inside) return true;
+                        offset += n;
                     }
-                    return inside;
+                    return false;
                 }
                 ${shader.vertexShader}
             `;
@@ -2092,7 +2106,7 @@
                 /vec3 c=vec3\(a,b\.x\);/,
                 `vec3 c=vec3(a,b.x);
                 vec3 wc = (modelMatrix * vec4(c, 1.0)).xyz;
-                if (clipEnabled > 0.5 && pointInPoly(wc.xz)) {
+                if (clipEnabled > 0.5 && insideAnyPoly(wc.xz)) {
                     gl_Position = vec4(0., 0., 2., 1.);
                     return;
                 }`
@@ -5112,6 +5126,8 @@
     const polyMarkers = [];
     const polyLineSegments = [];
     const columnWallSegments = [];
+    const committedPolygons = [];
+    const committedVisuals = [];
     const polyRaycaster = new Raycaster();
     const polyNDC = new Vector2();
     const polyPlane = new Plane(new Vector3(0, 1, 0), 0);
@@ -5130,22 +5146,17 @@
 
     function updatePolyButtons() {
         const n = polyVertices.length;
-        const locked = polyClosed && !columnClipActive;
-        if (boxApplyButton) boxApplyButton.disabled = locked;
+        const hasCommitted = committedPolygons.length > 0;
+        const awaitingAction = polyClosed && !columnGenerated;
+        if (boxApplyButton) boxApplyButton.disabled = awaitingAction;
         if (polyUndoButton) polyUndoButton.disabled = n === 0 || polyClosed;
         if (polyCloseButton) polyCloseButton.disabled = n < 3 || polyClosed;
-        if (polyGenColumnButton) {
-            polyGenColumnButton.disabled = !polyClosed || columnGenerated;
-            polyGenColumnButton.style.display = columnClipActive ? 'none' : '';
-        }
-        if (clipHideButton) {
-            clipHideButton.disabled = !columnGenerated || columnClipActive;
-            clipHideButton.style.display = columnClipActive ? 'none' : '';
-        }
-        if (clipShowButton) clipShowButton.style.display = columnClipActive ? '' : 'none';
+        if (polyGenColumnButton) polyGenColumnButton.disabled = !polyClosed || columnGenerated;
+        if (clipHideButton) clipHideButton.disabled = !columnGenerated;
+        if (clipShowButton) clipShowButton.style.display = hasCommitted ? '' : 'none';
         if (polyDrawButton) {
             polyDrawButton.textContent = polyDrawing ? 'Stop Drawing' : 'Draw Polygon';
-            polyDrawButton.disabled = locked;
+            polyDrawButton.disabled = awaitingAction;
         }
     }
 
@@ -5325,27 +5336,59 @@
         removeColumnVisual();
     }
 
-    function applyColumnHide() {
-        if (!polyClosed || polyVertices.length < 3) return;
-        const n = Math.min(polyVertices.length, POLY_MAX);
-        for (let i = 0; i < n; i++) {
-            columnClipUniforms.polyVerts.value[i].copy(polyVertices[i].clipXZ);
+    function rebuildClipUniforms() {
+        let offset = 0;
+        const groupCount = Math.min(committedPolygons.length, GROUPS_MAX);
+        for (let g = 0; g < groupCount; g++) {
+            const verts = committedPolygons[g];
+            columnClipUniforms.polySizes.value[g] = verts.length;
+            for (let i = 0; i < verts.length; i++) {
+                columnClipUniforms.polyVerts.value[offset + i].copy(verts[i]);
+            }
+            offset += verts.length;
         }
-        columnClipUniforms.polyCount.value = n;
-        columnClipUniforms.clipEnabled.value = 1.0;
+        columnClipUniforms.polyGroupCount.value = groupCount;
+        columnClipUniforms.clipEnabled.value = groupCount > 0 ? 1.0 : 0.0;
         const activeSplat = holeSplats[activeHoleIndex];
         if (activeSplat && activeSplat.material) activeSplat.material.needsUpdate = true;
-        columnClipActive = true;
-        if (glbEditorStatus) glbEditorStatus.textContent = `Clipping inside ${n}-vertex polygon.`;
+    }
+
+    function commitCurrentPolygon() {
+        const clipVerts = polyVertices.map(v => v.clipXZ.clone());
+        committedPolygons.push(clipVerts);
+        committedVisuals.push({
+            markers: [...polyMarkers],
+            lines: [...polyLineSegments],
+            walls: [...columnWallSegments]
+        });
+        polyMarkers.length = 0;
+        polyLineSegments.length = 0;
+        columnWallSegments.length = 0;
+        polyVertices.length = 0;
+        polyClosed = false;
+        columnGenerated = false;
+    }
+
+    function applyColumnHide() {
+        if (!polyClosed || polyVertices.length < 3) return;
+        commitCurrentPolygon();
+        rebuildClipUniforms();
+        columnClipActive = committedPolygons.length > 0;
+        if (glbEditorStatus) glbEditorStatus.textContent = `${committedPolygons.length} polygon${committedPolygons.length > 1 ? 's' : ''} clipped. Draw another or Show All.`;
         updatePolyButtons();
     }
 
     function applyColumnShow() {
-        columnClipUniforms.clipEnabled.value = 0.0;
-        const activeSplat = holeSplats[activeHoleIndex];
-        if (activeSplat && activeSplat.material) activeSplat.material.needsUpdate = true;
-        columnClipActive = false;
+        committedVisuals.forEach(v => {
+            v.markers.forEach(m => { scene.remove(m); m.geometry?.dispose(); });
+            v.lines.forEach(l => { scene.remove(l); l.geometry?.dispose(); });
+            v.walls.forEach(w => { scene.remove(w); w.geometry?.dispose(); });
+        });
+        committedVisuals.length = 0;
+        committedPolygons.length = 0;
         clearPolygon();
+        rebuildClipUniforms();
+        columnClipActive = false;
         if (glbEditorStatus) glbEditorStatus.textContent = 'All Gaussians restored. Draw a new polygon.';
         updatePolyButtons();
     }
@@ -5368,6 +5411,43 @@
     if (clipHideButton) clipHideButton.addEventListener('click', applyColumnHide);
     if (clipShowButton) clipShowButton.addEventListener('click', applyColumnShow);
     updatePolyButtons();
+
+    const exportRenderingBtn = document.getElementById('exportRenderingBtn');
+    if (exportRenderingBtn) exportRenderingBtn.addEventListener('click', () => {
+        const homeState = window.__homeModel && window.__homeModel.object;
+        const modelConfig = homeState ? {
+            url: '/assets/Cutout-optimized.glb',
+            position: {
+                x: +homeState.position.x.toFixed(6),
+                y: +homeState.position.y.toFixed(6),
+                z: +homeState.position.z.toFixed(6)
+            },
+            rotationDeg: {
+                x: +MathUtils.radToDeg(homeState.rotation.x).toFixed(3),
+                y: +MathUtils.radToDeg(homeState.rotation.y).toFixed(3),
+                z: +MathUtils.radToDeg(homeState.rotation.z).toFixed(3)
+            },
+            scale: +homeState.scale.x.toFixed(6),
+            brightness: window.__homeEditor?.getState?.()?.brightness ?? 1.0
+        } : null;
+
+        const clipPolygons = committedPolygons.map(verts =>
+            verts.map(v => ({ x: +v.x.toFixed(6), y: +v.y.toFixed(6) }))
+        );
+
+        const config = { model: modelConfig, clipPolygons };
+        const json = JSON.stringify(config, null, 2);
+        navigator.clipboard.writeText(json).then(
+            () => {
+                if (glbEditorStatus) glbEditorStatus.textContent = 'Rendering config copied to clipboard!';
+            },
+            () => {
+                if (glbEditorStatus) glbEditorStatus.textContent = 'Copy failed — check clipboard permissions.';
+            }
+        );
+        console.log('Rendering config:', json);
+    });
+
     // ── End Polygon Column Clipper ──────────────────────────────────────
 
     // Original base spacing and sizes:

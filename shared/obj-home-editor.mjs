@@ -11,7 +11,12 @@ import {
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+dracoLoader.setDecoderConfig({ type: 'js' });
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -449,6 +454,7 @@ export function initObjHomeEditor(options = {}) {
     setStatus(`Loading GLB (${sourceLabel})…`);
     return new Promise((resolve) => {
       const loader = new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
       loader.parse(arrayBuffer, '', (gltf) => {
         const group = new Group();
         group.name = `home-model-${propertyLabel}`;
@@ -888,7 +894,31 @@ export function initObjHomeEditor(options = {}) {
   return {
     setOpen,
     removeModel,
-    copyConfigJson
+    copyConfigJson,
+    loadFromUrls,
+    loadFromGlbBuffer,
+    applyTransform(cfg) {
+      const obj = state.modelGroup;
+      if (!obj || !cfg) return;
+      if (cfg.position) {
+        if (Number.isFinite(cfg.position.x)) obj.position.x = cfg.position.x;
+        if (Number.isFinite(cfg.position.y)) obj.position.y = cfg.position.y;
+        if (Number.isFinite(cfg.position.z)) obj.position.z = cfg.position.z;
+      }
+      if (cfg.rotationDeg) {
+        if (Number.isFinite(cfg.rotationDeg.x)) obj.rotation.x = MathUtils.degToRad(cfg.rotationDeg.x);
+        if (Number.isFinite(cfg.rotationDeg.y)) obj.rotation.y = MathUtils.degToRad(cfg.rotationDeg.y);
+        if (Number.isFinite(cfg.rotationDeg.z)) obj.rotation.z = MathUtils.degToRad(cfg.rotationDeg.z);
+      }
+      if (Number.isFinite(cfg.scale)) obj.scale.setScalar(cfg.scale);
+      if (Number.isFinite(cfg.brightness)) {
+        state.brightness = cfg.brightness;
+        applyBrightness(obj, state.brightness);
+      }
+      syncInputsFromObject();
+      attachGizmoIfNeeded();
+    },
+    getState() { return state; }
   };
 }
 
