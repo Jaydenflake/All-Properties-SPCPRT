@@ -5223,7 +5223,7 @@
             return;
         }
 
-        polyVertices.push({ world: worldHit.clone(), clipXZ: new Vector2(worldHit.x, worldHit.z) });
+        polyVertices.push({ world: worldHit.clone(), clipXZ: new Vector2(-worldHit.x, worldHit.z) });
 
         const markerGeo = new SphereGeometry(0.008, 8, 8);
         const marker = new Mesh(markerGeo, polyMarkerMaterial);
