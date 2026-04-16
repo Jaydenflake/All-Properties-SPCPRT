@@ -4284,6 +4284,8 @@
         };
     }
 
+    window.__getSplatExportPayload = getSplatExportPayload;
+
     function initializeSplatEditor() {
         if (!splatEditorState.enabled) {
             if (splatEditorToggleWrap) splatEditorToggleWrap.style.display = 'none';
@@ -5532,6 +5534,25 @@
     if (liftDoneButton) liftDoneButton.addEventListener('click', deactivateLiftMode);
     if (liftResetButton) liftResetButton.addEventListener('click', resetLift);
     updatePolyButtons();
+
+    window.__getClipPolygonsPayload = () => committedPolygons.map(verts =>
+        verts.map(v => ({ x: +v.x.toFixed(6), y: +v.y.toFixed(6) }))
+    );
+
+    window.__getLiftPayload = () => {
+        const enabled = liftUniforms.liftEnabled.value > 0.5;
+        const size = Math.max(0, Math.min(LIFT_VERTS_MAX, liftUniforms.liftPolySize.value | 0));
+        const polygon = [];
+        for (let i = 0; i < size; i++) {
+            const v = liftUniforms.liftPolyVerts.value[i];
+            polygon.push({ x: +v.x.toFixed(6), y: +v.y.toFixed(6) });
+        }
+        return {
+            enabled,
+            amount: +liftUniforms.liftAmount.value.toFixed(6),
+            polygon
+        };
+    };
 
     const exportRenderingBtn = document.getElementById('exportRenderingBtn');
     if (exportRenderingBtn) exportRenderingBtn.addEventListener('click', () => {

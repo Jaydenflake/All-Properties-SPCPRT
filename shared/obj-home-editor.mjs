@@ -786,9 +786,9 @@ export function initObjHomeEditor(options = {}) {
     await loadFromTexts({ objText, mtlText, baseUrl, sourceLabel: 'file' });
   }
 
-  // --- Copy JSON for ALL polygons ---
-  function copyConfigJson() {
-    const payload = state.polygons.map((poly) => {
+  // --- Build payload for ALL polygons (reusable) ---
+  function getPolygonsPayload() {
+    return state.polygons.map((poly) => {
       const obj = poly.group;
       return {
         name: poly.name,
@@ -807,12 +807,55 @@ export function initObjHomeEditor(options = {}) {
         recenter: { center: !!state.recenter.center, groundToZero: !!state.recenter.ground }
       };
     });
+  }
+
+  function copyConfigJson() {
+    const payload = getPolygonsPayload();
     const text = JSON.stringify(payload, null, 2);
     navigator.clipboard.writeText(text).then(
       () => setStatus('Copied all polygon configs as JSON.'),
       () => setStatus('Copy failed (clipboard permission).')
     );
     window.__homeModelConfig = payload;
+  }
+
+  // --- Export ALL editors bundled into one JSON ---
+  function copyExportAllJson() {
+    const homePolygons = getPolygonsPayload();
+    const splatTransform = (typeof window.__getSplatExportPayload === 'function')
+      ? (window.__getSplatExportPayload() || null)
+      : null;
+    const clipPolygons = (typeof window.__getClipPolygonsPayload === 'function')
+      ? (window.__getClipPolygonsPayload() || [])
+      : [];
+    const liftedRegion = (typeof window.__getLiftPayload === 'function')
+      ? (window.__getLiftPayload() || null)
+      : null;
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      property: propertyLabel,
+      splatTransform,
+      clipPolygons,
+      liftedRegion,
+      homePolygons
+    };
+
+    const hasLift = !!(liftedRegion && liftedRegion.enabled && liftedRegion.polygon.length >= 3);
+    const summary = [
+      splatTransform ? 'splat' : null,
+      `${clipPolygons.length} clip poly${clipPolygons.length === 1 ? '' : 's'}`,
+      hasLift ? `lift ${liftedRegion.amount.toFixed(3)}` : null,
+      `${homePolygons.length} home poly${homePolygons.length === 1 ? '' : 's'}`
+    ].filter(Boolean).join(', ');
+
+    const text = JSON.stringify(payload, null, 2);
+    navigator.clipboard.writeText(text).then(
+      () => setStatus(`Copied combined export (${summary}).`),
+      () => setStatus('Copy failed (clipboard permission).')
+    );
+    window.__fullExportConfig = payload;
+    return payload;
   }
 
   // --- Build panel HTML ---
@@ -960,6 +1003,9 @@ export function initObjHomeEditor(options = {}) {
       <div class="obj-home-actions" style="margin-top:6px;">
         <button id="objHomeAlignBtn" type="button" style="flex:1 1 100%;background:rgba(34,139,34,0.35);border-color:rgba(34,139,34,0.5);">Align Model</button>
       </div>
+      <div class="obj-home-actions" style="margin-top:6px;">
+        <button id="objHomeExportAllBtn" type="button" style="flex:1 1 100%;background:rgba(66,133,244,0.35);border-color:rgba(66,133,244,0.5);">Export All (Splat + Clip + Polygons)</button>
+      </div>
     </div>
   `;
   document.body.appendChild(ui.panel);
@@ -1087,6 +1133,11 @@ export function initObjHomeEditor(options = {}) {
     setStatus('Aligned model to saved coordinates.');
   });
 
+  const exportAllBtn = ui.panel.querySelector('#objHomeExportAllBtn');
+  exportAllBtn.addEventListener('click', () => {
+    copyExportAllJson();
+  });
+
   // --- Initial state ---
   updateModeButtons();
   renderPolygonList();
@@ -1106,13 +1157,16 @@ export function initObjHomeEditor(options = {}) {
       syncInputsFromObject();
       updatePanelTitle();
     },
-    copyConfig: copyConfigJson
+    copyConfig: copyConfigJson,
+    copyExportAll: copyExportAllJson
   };
 
   return {
     setOpen,
     removePolygon,
     copyConfigJson,
+    copyExportAllJson,
+    getPolygonsPayload,
     loadFromUrls,
     loadFromGlbBuffer,
     applyTransform(cfg) {
