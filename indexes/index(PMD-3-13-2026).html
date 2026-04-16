@@ -1467,6 +1467,9 @@
             <button id="polyGenColumnButton" type="button" class="glb-editor-action-btn" disabled>Generate Column</button>
             <button id="clipHideButton" type="button" class="glb-editor-action-btn" disabled>Hide Gaussians</button>
             <button id="clipShowButton" type="button" class="glb-editor-action-btn" style="display:none">Show All</button>
+            <button id="liftMoveButton" type="button" class="glb-editor-action-btn" disabled>Move Gaussians</button>
+            <button id="liftDoneButton" type="button" class="glb-editor-action-btn" style="display:none">Done Moving</button>
+            <button id="liftResetButton" type="button" class="glb-editor-action-btn" style="display:none">Reset Lift</button>
         </div>
         <div class="glb-editor-actions" style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.15);padding-top:8px;">
             <button id="exportRenderingBtn" type="button" class="glb-editor-action-btn" style="background:rgba(34,139,34,0.35);width:100%">Export Rendering Config</button>
@@ -2064,6 +2067,14 @@
         polyVerts: { value: Array.from({ length: VERTS_MAX }, () => new Vector2(0, 0)) }
     };
 
+    const LIFT_VERTS_MAX = 64;
+    const liftUniforms = {
+        liftEnabled:  { value: 0.0 },
+        liftAmount:   { value: 0.0 },
+        liftPolySize: { value: 0.0 },
+        liftPolyVerts: { value: Array.from({ length: LIFT_VERTS_MAX }, () => new Vector2(0, 0)) }
+    };
+
     function applyColumnClip(splat) {
         if (!splat || !splat.material) return;
         splat.material.onBeforeCompile = (shader) => {
@@ -2072,11 +2083,20 @@
             shader.uniforms.polySizes = columnClipUniforms.polySizes;
             shader.uniforms.polyVerts = columnClipUniforms.polyVerts;
 
+            shader.uniforms.liftEnabled = liftUniforms.liftEnabled;
+            shader.uniforms.liftAmount = liftUniforms.liftAmount;
+            shader.uniforms.liftPolySize = liftUniforms.liftPolySize;
+            shader.uniforms.liftPolyVerts = liftUniforms.liftPolyVerts;
+
             shader.vertexShader = `
                 uniform float clipEnabled;
                 uniform float polyGroupCount;
                 uniform float polySizes[${GROUPS_MAX}];
                 uniform vec2 polyVerts[${VERTS_MAX}];
+                uniform float liftEnabled;
+                uniform float liftAmount;
+                uniform float liftPolySize;
+                uniform vec2 liftPolyVerts[${LIFT_VERTS_MAX}];
                 bool insideAnyPoly(vec2 p) {
                     int numGroups = int(polyGroupCount);
                     int offset = 0;
@@ -2099,6 +2119,22 @@
                     }
                     return false;
                 }
+                bool insideLiftPoly(vec2 p) {
+                    int n = int(liftPolySize);
+                    if (n < 3) return false;
+                    bool inside = false;
+                    for (int i = 0; i < ${LIFT_VERTS_MAX}; i++) {
+                        if (i >= n) break;
+                        int j = i == 0 ? n - 1 : i - 1;
+                        vec2 vi = liftPolyVerts[i];
+                        vec2 vj = liftPolyVerts[j];
+                        if (((vi.y > p.y) != (vj.y > p.y)) &&
+                            (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x)) {
+                            inside = !inside;
+                        }
+                    }
+                    return inside;
+                }
                 ${shader.vertexShader}
             `;
 
@@ -2109,6 +2145,9 @@
                 if (clipEnabled > 0.5 && insideAnyPoly(wc.xz)) {
                     gl_Position = vec4(0., 0., 2., 1.);
                     return;
+                }
+                if (liftEnabled > 0.5 && insideLiftPoly(wc.xz)) {
+                    c.y += liftAmount;
                 }`
             );
         };
@@ -5116,12 +5155,19 @@
     const polyGenColumnButton = document.getElementById('polyGenColumnButton');
     const clipHideButton = document.getElementById('clipHideButton');
     const clipShowButton = document.getElementById('clipShowButton');
+    const liftMoveButton = document.getElementById('liftMoveButton');
+    const liftDoneButton = document.getElementById('liftDoneButton');
+    const liftResetButton = document.getElementById('liftResetButton');
 
     let glbEditorOpen = false;
     let polyDrawing = false;
     let polyClosed = false;
     let columnGenerated = false;
     let columnClipActive = false;
+    let liftMode = false;
+    let liftDragging = false;
+    let liftStartY = 0;
+    let liftBaseAmount = 0;
     const polyVertices = [];
     const polyMarkers = [];
     const polyLineSegments = [];
@@ -5142,21 +5188,29 @@
             glbEditorToggle.setAttribute('aria-pressed', glbEditorOpen ? 'true' : 'false');
         }
         if (!glbEditorOpen && polyDrawing) stopDrawing();
+        if (!glbEditorOpen && liftMode) deactivateLiftMode();
     }
 
     function updatePolyButtons() {
         const n = polyVertices.length;
         const hasCommitted = committedPolygons.length > 0;
-        const awaitingAction = polyClosed && !columnGenerated;
-        if (boxApplyButton) boxApplyButton.disabled = awaitingAction;
-        if (polyUndoButton) polyUndoButton.disabled = n === 0 || polyClosed;
-        if (polyCloseButton) polyCloseButton.disabled = n < 3 || polyClosed;
-        if (polyGenColumnButton) polyGenColumnButton.disabled = !polyClosed || columnGenerated;
-        if (clipHideButton) clipHideButton.disabled = !columnGenerated;
+        const awaitingAction = polyClosed && !columnGenerated && !liftMode;
+        const hasLift = liftUniforms.liftEnabled.value > 0.5;
+        if (boxApplyButton) boxApplyButton.disabled = awaitingAction || liftMode;
+        if (polyUndoButton) polyUndoButton.disabled = n === 0 || polyClosed || liftMode;
+        if (polyCloseButton) polyCloseButton.disabled = n < 3 || polyClosed || liftMode;
+        if (polyGenColumnButton) polyGenColumnButton.disabled = !polyClosed || columnGenerated || liftMode;
+        if (clipHideButton) clipHideButton.disabled = !columnGenerated || liftMode;
         if (clipShowButton) clipShowButton.style.display = hasCommitted ? '' : 'none';
+        if (liftMoveButton) {
+            liftMoveButton.disabled = !polyClosed || liftMode;
+            liftMoveButton.style.display = liftMode ? 'none' : '';
+        }
+        if (liftDoneButton) liftDoneButton.style.display = liftMode ? '' : 'none';
+        if (liftResetButton) liftResetButton.style.display = (liftMode || hasLift) ? '' : 'none';
         if (polyDrawButton) {
             polyDrawButton.textContent = polyDrawing ? 'Stop Drawing' : 'Draw Polygon';
-            polyDrawButton.disabled = awaitingAction;
+            polyDrawButton.disabled = awaitingAction || liftMode;
         }
     }
 
@@ -5393,13 +5447,77 @@
         updatePolyButtons();
     }
 
+    function activateLiftMode() {
+        if (!polyClosed || polyVertices.length < 3) return;
+        const n = Math.min(polyVertices.length, LIFT_VERTS_MAX);
+        for (let i = 0; i < n; i++) {
+            liftUniforms.liftPolyVerts.value[i].copy(polyVertices[i].clipXZ);
+        }
+        liftUniforms.liftPolySize.value = n;
+        liftUniforms.liftEnabled.value = 1.0;
+        liftUniforms.liftAmount.value = 0.0;
+        liftMode = true;
+        liftDragging = false;
+        renderer.domElement.style.cursor = 'ns-resize';
+        const activeSplat = holeSplats[activeHoleIndex];
+        if (activeSplat && activeSplat.material) activeSplat.material.needsUpdate = true;
+        if (glbEditorStatus) glbEditorStatus.textContent = 'Drag up/down on canvas to raise or lower Gaussians.';
+        updatePolyButtons();
+    }
+
+    function deactivateLiftMode() {
+        liftMode = false;
+        liftDragging = false;
+        controls.enabled = true;
+        renderer.domElement.style.cursor = '';
+        if (glbEditorStatus) glbEditorStatus.textContent = `Lift applied (${liftUniforms.liftAmount.value.toFixed(3)}). Draw another polygon or Reset Lift.`;
+        updatePolyButtons();
+    }
+
+    function resetLift() {
+        liftUniforms.liftAmount.value = 0.0;
+        liftUniforms.liftEnabled.value = 0.0;
+        liftUniforms.liftPolySize.value = 0.0;
+        liftMode = false;
+        liftDragging = false;
+        controls.enabled = true;
+        renderer.domElement.style.cursor = '';
+        const activeSplat = holeSplats[activeHoleIndex];
+        if (activeSplat && activeSplat.material) activeSplat.material.needsUpdate = true;
+        clearPolygon();
+        if (glbEditorStatus) glbEditorStatus.textContent = 'Lift reset. Draw a new polygon.';
+        updatePolyButtons();
+    }
+
     renderer.domElement.addEventListener('pointerdown', (event) => {
+        if (liftMode && event.button === 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            liftDragging = true;
+            liftStartY = event.clientY;
+            liftBaseAmount = liftUniforms.liftAmount.value;
+            controls.enabled = false;
+            return;
+        }
         if (!polyDrawing || polyClosed || event.button !== 0) return;
         if (event.target !== renderer.domElement) return;
         event.preventDefault();
         event.stopPropagation();
         placeVertex(event);
     }, { passive: false, capture: true });
+
+    renderer.domElement.addEventListener('pointermove', (event) => {
+        if (!liftMode || !liftDragging) return;
+        const deltaY = liftStartY - event.clientY;
+        liftUniforms.liftAmount.value = liftBaseAmount + deltaY * 0.002;
+    }, { passive: true });
+
+    renderer.domElement.addEventListener('pointerup', (event) => {
+        if (liftDragging) {
+            liftDragging = false;
+            controls.enabled = true;
+        }
+    }, { passive: true });
 
     if (glbEditorToggle) glbEditorToggle.addEventListener('click', () => setGlbEditorOpen(!glbEditorOpen));
     if (glbEditorCloseButton) glbEditorCloseButton.addEventListener('click', () => setGlbEditorOpen(false));
@@ -5410,6 +5528,9 @@
     if (polyGenColumnButton) polyGenColumnButton.addEventListener('click', generateColumnVisual);
     if (clipHideButton) clipHideButton.addEventListener('click', applyColumnHide);
     if (clipShowButton) clipShowButton.addEventListener('click', applyColumnShow);
+    if (liftMoveButton) liftMoveButton.addEventListener('click', activateLiftMode);
+    if (liftDoneButton) liftDoneButton.addEventListener('click', deactivateLiftMode);
+    if (liftResetButton) liftResetButton.addEventListener('click', resetLift);
     updatePolyButtons();
 
     const exportRenderingBtn = document.getElementById('exportRenderingBtn');

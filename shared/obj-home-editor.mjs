@@ -199,6 +199,72 @@ function ensureStyles() {
     }
     .obj-home-inline input { width: 16px; height: 16px; cursor: pointer; }
 
+    /* Polygon list styles */
+    .obj-poly-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 4px;
+    }
+    .obj-poly-list-empty {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      font-style: italic;
+      padding: 2px 0 4px;
+    }
+    .obj-poly-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: border-color 0.15s;
+    }
+    .obj-poly-row.active-poly {
+      border-color: rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.07);
+    }
+    .obj-poly-row.locked-poly {
+      opacity: 0.7;
+    }
+    .obj-poly-name {
+      flex: 1;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .obj-poly-btn {
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 7px;
+      background: rgba(0,0,0,0.3);
+      color: rgba(255,255,255,0.85);
+      font: 600 10px/1 'Helvetica Neue', Arial, sans-serif;
+      padding: 4px 7px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .obj-poly-btn:hover {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.35);
+    }
+    .obj-poly-btn.lock-btn.is-locked {
+      color: #f0c040;
+      border-color: rgba(240,192,64,0.4);
+    }
+    .obj-poly-btn.delete-btn {
+      color: #e85a4f;
+      border-color: rgba(232,90,79,0.3);
+    }
+    .obj-poly-btn.delete-btn:hover {
+      background: rgba(232,90,79,0.25);
+    }
+
     body.recording-mode .obj-home-panel { visibility: hidden !important; }
   `;
   document.head.appendChild(style);
@@ -321,15 +387,15 @@ export function initObjHomeEditor(options = {}) {
   ensureStyles();
   const toolbarWrap = getOrCreateTopRightToolbarWrap();
 
+  // --- State ---
   const state = {
     open: false,
-    modelGroup: null,
-    objSource: { type: 'none', obj: '', mtl: '', baseUrl: '' },
+    polygons: [],       // array of { id, name, group, locked, brightness, source }
+    activeIndex: -1,    // index into state.polygons of the currently-editing polygon
+    nextId: 1,          // auto-increment for "Polygon N" naming
     recenter: { center: true, ground: true },
-    transform: { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 1 },
     gizmoEnabled: false,
     gizmoMode: 'translate',
-    brightness: 1.0
   };
 
   const ui = {};
@@ -344,6 +410,7 @@ export function initObjHomeEditor(options = {}) {
     if (ui.panel) ui.panel.classList.toggle('active', state.open);
   };
 
+  // --- TransformControls ---
   const transformControls = new TransformControls(camera, renderer.domElement);
   transformControls.visible = false;
   transformControls.enabled = true;
@@ -352,39 +419,156 @@ export function initObjHomeEditor(options = {}) {
     controls.enabled = !event.value;
   });
   transformControls.addEventListener('objectChange', () => {
-    if (!state.modelGroup) return;
+    const poly = state.polygons[state.activeIndex];
+    if (!poly || poly.locked) return;
     syncInputsFromObject();
   });
   scene.add(transformControls);
 
+  function activeGroup() {
+    const poly = state.polygons[state.activeIndex];
+    return (poly && !poly.locked) ? poly.group : null;
+  }
+
   function attachGizmoIfNeeded() {
-    if (!state.modelGroup) {
+    const grp = activeGroup();
+    if (!grp || !state.gizmoEnabled) {
       transformControls.detach();
       transformControls.visible = false;
       return;
     }
-    if (!state.gizmoEnabled) {
-      transformControls.detach();
-      transformControls.visible = false;
-      return;
-    }
-    transformControls.attach(state.modelGroup);
+    transformControls.attach(grp);
     transformControls.setMode(state.gizmoMode);
     transformControls.visible = true;
   }
 
-  function removeModel() {
-    if (!state.modelGroup) return;
-    transformControls.detach();
-    transformControls.visible = false;
-    scene.remove(state.modelGroup);
-    state.modelGroup = null;
-    setStatus('Removed home model.');
-    syncInputsFromObject();
+  // --- Polygon list rendering ---
+  function renderPolygonList() {
+    const container = ui.polyList;
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (state.polygons.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'obj-poly-list-empty';
+      empty.textContent = 'No polygons loaded yet.';
+      container.appendChild(empty);
+      return;
+    }
+
+    state.polygons.forEach((poly, idx) => {
+      const row = document.createElement('div');
+      row.className = 'obj-poly-row' +
+        (idx === state.activeIndex ? ' active-poly' : '') +
+        (poly.locked ? ' locked-poly' : '');
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'obj-poly-name';
+      nameEl.textContent = poly.name;
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'obj-poly-btn edit-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.disabled = idx === state.activeIndex && !poly.locked;
+      editBtn.addEventListener('click', () => setActivePolygon(idx));
+
+      const lockBtn = document.createElement('button');
+      lockBtn.type = 'button';
+      lockBtn.className = 'obj-poly-btn lock-btn' + (poly.locked ? ' is-locked' : '');
+      lockBtn.textContent = poly.locked ? 'Unlock' : 'Lock';
+      lockBtn.addEventListener('click', () => toggleLock(idx));
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'obj-poly-btn delete-btn';
+      deleteBtn.textContent = '✕';
+      deleteBtn.title = `Remove ${poly.name}`;
+      deleteBtn.addEventListener('click', () => removePolygon(idx));
+
+      row.appendChild(nameEl);
+      row.appendChild(editBtn);
+      row.appendChild(lockBtn);
+      row.appendChild(deleteBtn);
+      container.appendChild(row);
+    });
   }
 
+  // --- Set active polygon ---
+  function setActivePolygon(index) {
+    const poly = state.polygons[index];
+    if (!poly) return;
+    if (poly.locked) {
+      setStatus(`${poly.name} is locked. Click Unlock to edit it.`);
+      return;
+    }
+    state.activeIndex = index;
+
+    // Update brightness slider to this polygon's brightness
+    const bs = ui.panel.querySelector('#objHomeBrightness');
+    const bv = ui.panel.querySelector('#objHomeBrightnessVal');
+    if (bs) bs.value = poly.brightness;
+    if (bv) bv.textContent = poly.brightness.toFixed(1);
+
+    syncInputsFromObject();
+    attachGizmoIfNeeded();
+    updatePanelTitle();
+    renderPolygonList();
+    setStatus(`Editing ${poly.name}. Use gizmo or fields to position.`);
+  }
+
+  function updatePanelTitle() {
+    if (!ui.title) return;
+    const poly = state.polygons[state.activeIndex];
+    ui.title.textContent = poly ? `Editing: ${poly.name}` : 'Polygons';
+  }
+
+  // --- Lock / Unlock ---
+  function toggleLock(index) {
+    const poly = state.polygons[index];
+    if (!poly) return;
+    poly.locked = !poly.locked;
+
+    if (poly.locked && state.activeIndex === index) {
+      // Deactivate: detach gizmo, clear inputs
+      state.activeIndex = -1;
+      transformControls.detach();
+      transformControls.visible = false;
+      syncInputsFromObject();
+      updatePanelTitle();
+      setStatus(`${poly.name} locked.`);
+    } else if (!poly.locked) {
+      setStatus(`${poly.name} unlocked. Click Edit to adjust it.`);
+    }
+    renderPolygonList();
+  }
+
+  // --- Remove polygon ---
+  function removePolygon(index) {
+    const poly = state.polygons[index];
+    if (!poly) return;
+    if (!confirm(`Remove ${poly.name} from the scene?`)) return;
+
+    transformControls.detach();
+    transformControls.visible = false;
+    scene.remove(poly.group);
+    state.polygons.splice(index, 1);
+
+    if (state.activeIndex === index) {
+      state.activeIndex = -1;
+      syncInputsFromObject();
+      updatePanelTitle();
+    } else if (state.activeIndex > index) {
+      state.activeIndex--;
+    }
+
+    renderPolygonList();
+    setStatus(`Removed ${poly.name}.`);
+  }
+
+  // --- Sync inputs from active polygon's group ---
   function syncInputsFromObject() {
-    const obj = state.modelGroup;
+    const obj = activeGroup();
     if (!obj) {
       if (ui.posX) ui.posX.value = '';
       if (ui.posY) ui.posY.value = '';
@@ -394,7 +578,7 @@ export function initObjHomeEditor(options = {}) {
       if (ui.rotZ) ui.rotZ.value = '';
       if (ui.scale) ui.scale.value = '';
       if (ui.removeBtn) ui.removeBtn.disabled = true;
-      if (ui.copyBtn) ui.copyBtn.disabled = true;
+      if (ui.copyBtn) ui.copyBtn.disabled = false; // still allow copy all
       if (ui.resetBtn) ui.resetBtn.disabled = true;
       if (ui.gizmoToggle) ui.gizmoToggle.checked = false;
       state.gizmoEnabled = false;
@@ -414,7 +598,7 @@ export function initObjHomeEditor(options = {}) {
   }
 
   function applyInputsToObject() {
-    const obj = state.modelGroup;
+    const obj = activeGroup();
     if (!obj) return;
     const x = parseFloat(ui.posX?.value);
     const y = parseFloat(ui.posY?.value);
@@ -439,7 +623,7 @@ export function initObjHomeEditor(options = {}) {
   }
 
   function resetTransform() {
-    const obj = state.modelGroup;
+    const obj = activeGroup();
     if (!obj) return;
     obj.position.set(0, 0, 0);
     obj.rotation.set(0, 0, 0);
@@ -449,25 +633,49 @@ export function initObjHomeEditor(options = {}) {
     setStatus('Reset transform.');
   }
 
+  // --- Create and register a new polygon entry ---
+  function createPolygon(group, source, brightnessVal) {
+    const id = state.nextId++;
+    const poly = {
+      id,
+      name: `Polygon ${id}`,
+      group,
+      locked: false,
+      brightness: brightnessVal ?? 1.0,
+      source
+    };
+    state.polygons.push(poly);
+    return state.polygons.length - 1; // return index
+  }
+
+  // --- Load from GLB buffer (appends a new polygon) ---
   async function loadFromGlbBuffer(arrayBuffer, sourceLabel) {
-    removeModel();
     setStatus(`Loading GLB (${sourceLabel})…`);
     return new Promise((resolve) => {
       const loader = new GLTFLoader();
       loader.setDRACOLoader(dracoLoader);
       loader.parse(arrayBuffer, '', (gltf) => {
         const group = new Group();
-        group.name = `home-model-${propertyLabel}`;
+        group.name = `polygon-${state.nextId}-${propertyLabel}`;
         group.add(gltf.scene || gltf.scenes[0]);
         convertToUnlitMaterials(group);
-        applyBrightness(group, state.brightness);
+        applyBrightness(group, 1.0);
         computeAndApplyRecenter(group, { center: state.recenter.center, groundToZero: state.recenter.ground });
         scene.add(group);
-        state.modelGroup = group;
-        state.objSource = { type: 'glb', obj: sourceLabel, mtl: '', baseUrl: '' };
-        setStatus(`Loaded home model (${sourceLabel}). Use gizmo or fields to align.`);
+        const idx = createPolygon(group, { type: 'glb', obj: sourceLabel, mtl: '', baseUrl: '' }, 1.0);
+        state.activeIndex = idx;
+        renderPolygonList();
+        updatePanelTitle();
         syncInputsFromObject();
         attachGizmoIfNeeded();
+
+        // Sync brightness slider
+        const bs = ui.panel.querySelector('#objHomeBrightness');
+        const bv = ui.panel.querySelector('#objHomeBrightnessVal');
+        if (bs) bs.value = 1.0;
+        if (bv) bv.textContent = '1.0';
+
+        setStatus(`Loaded ${state.polygons[idx].name} (${sourceLabel}). Use gizmo or fields to align.`);
         resolve();
       }, (err) => {
         console.warn('GLTFLoader error:', err);
@@ -477,10 +685,10 @@ export function initObjHomeEditor(options = {}) {
     });
   }
 
+  // --- Load from OBJ/MTL texts (appends a new polygon) ---
   async function loadFromTexts({ objText, mtlText, baseUrl, sourceLabel }) {
-    removeModel();
     const group = new Group();
-    group.name = `home-model-${propertyLabel}`;
+    group.name = `polygon-${state.nextId}-${propertyLabel}`;
 
     try {
       const objLoader = new OBJLoader();
@@ -515,20 +723,26 @@ export function initObjHomeEditor(options = {}) {
       } else {
         applyDefaultMaterial(group);
       }
-      applyBrightness(group, state.brightness);
-
+      applyBrightness(group, 1.0);
       computeAndApplyRecenter(group, { center: state.recenter.center, groundToZero: state.recenter.ground });
 
       scene.add(group);
-      state.modelGroup = group;
-      state.objSource = { ...state.objSource, baseUrl: baseUrl || '' };
-      setStatus(`Loaded home model (${sourceLabel}). Use gizmo or fields to align.`); // keep short
+      const idx = createPolygon(group, { type: 'obj', obj: sourceLabel, mtl: '', baseUrl: baseUrl || '' }, 1.0);
+      state.activeIndex = idx;
+      renderPolygonList();
+      updatePanelTitle();
       syncInputsFromObject();
       attachGizmoIfNeeded();
+
+      const bs = ui.panel.querySelector('#objHomeBrightness');
+      const bv = ui.panel.querySelector('#objHomeBrightnessVal');
+      if (bs) bs.value = 1.0;
+      if (bv) bv.textContent = '1.0';
+
+      setStatus(`Loaded ${state.polygons[idx].name} (${sourceLabel}). Use gizmo or fields to align.`);
     } catch (err) {
       console.warn(err);
       setStatus('Failed to load OBJ/MTL. Check console for details.');
-      removeModel();
     }
   }
 
@@ -553,7 +767,6 @@ export function initObjHomeEditor(options = {}) {
       fetch(objUrl).then((r) => r.text()),
       mtlUrl ? fetch(mtlUrl).then((r) => r.text()) : Promise.resolve('')
     ]);
-    state.objSource = { type: 'url', obj: objUrl, mtl: mtlUrl || '', baseUrl: baseUrl || '' };
     await loadFromTexts({ objText, mtlText, baseUrl, sourceLabel: 'URL' });
   }
 
@@ -570,41 +783,45 @@ export function initObjHomeEditor(options = {}) {
       readFileAsText(objFile),
       mtlFile ? readFileAsText(mtlFile) : Promise.resolve('')
     ]);
-    state.objSource = { type: 'file', obj: objFile.name, mtl: mtlFile ? mtlFile.name : '', baseUrl: baseUrl || '' };
     await loadFromTexts({ objText, mtlText, baseUrl, sourceLabel: 'file' });
   }
 
+  // --- Copy JSON for ALL polygons ---
   function copyConfigJson() {
-    const obj = state.modelGroup;
-    if (!obj) return;
-    const payload = {
-      source: state.objSource,
-      transform: {
-        position: { x: +obj.position.x.toFixed(6), y: +obj.position.y.toFixed(6), z: +obj.position.z.toFixed(6) },
-        rotationDeg: {
-          x: +MathUtils.radToDeg(obj.rotation.x).toFixed(3),
-          y: +MathUtils.radToDeg(obj.rotation.y).toFixed(3),
-          z: +MathUtils.radToDeg(obj.rotation.z).toFixed(3)
+    const payload = state.polygons.map((poly) => {
+      const obj = poly.group;
+      return {
+        name: poly.name,
+        locked: poly.locked,
+        source: poly.source,
+        transform: {
+          position: { x: +obj.position.x.toFixed(6), y: +obj.position.y.toFixed(6), z: +obj.position.z.toFixed(6) },
+          rotationDeg: {
+            x: +MathUtils.radToDeg(obj.rotation.x).toFixed(3),
+            y: +MathUtils.radToDeg(obj.rotation.y).toFixed(3),
+            z: +MathUtils.radToDeg(obj.rotation.z).toFixed(3)
+          },
+          scale: +obj.scale.x.toFixed(6)
         },
-        scale: +obj.scale.x.toFixed(6)
-      },
-      recenter: { center: !!state.recenter.center, groundToZero: !!state.recenter.ground }
-    };
+        brightness: poly.brightness,
+        recenter: { center: !!state.recenter.center, groundToZero: !!state.recenter.ground }
+      };
+    });
     const text = JSON.stringify(payload, null, 2);
     navigator.clipboard.writeText(text).then(
-      () => setStatus('Copied model config JSON.'),
+      () => setStatus('Copied all polygon configs as JSON.'),
       () => setStatus('Copy failed (clipboard permission).')
     );
     window.__homeModelConfig = payload;
   }
 
-  // UI creation
+  // --- Build panel HTML ---
   ui.toggle = document.createElement('button');
   ui.toggle.type = 'button';
   ui.toggle.className = 'obj-home-toggle-btn';
   ui.toggle.id = 'objHomeToggleBtn';
   ui.toggle.setAttribute('aria-label', 'Home model');
-  ui.toggle.setAttribute('title', 'Import and place a home model');
+  ui.toggle.setAttribute('title', 'Import and place home model polygons');
   ui.toggle.innerHTML =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v11h14V10"/><path d="M9 21v-7h6v7"/></svg>';
 
@@ -615,11 +832,17 @@ export function initObjHomeEditor(options = {}) {
   ui.panel.id = 'objHomePanel';
   ui.panel.innerHTML = `
     <div class="obj-home-header">
-      <div class="obj-home-title">Home model</div>
+      <div class="obj-home-title" id="objHomeTitle">Polygons</div>
       <button type="button" class="obj-home-close" aria-label="Close">×</button>
     </div>
     <div class="obj-home-status" id="objHomeStatus"></div>
 
+    <!-- Polygon list -->
+    <div class="obj-home-section" style="margin-top:0;border-top:0;padding-top:0;">
+      <div class="obj-poly-list" id="objHomePolygonList"></div>
+    </div>
+
+    <!-- GLB upload -->
     <div class="obj-home-section">
       <div class="obj-home-row" style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:6px;">
         <label></label><span>✦ Recommended — single file with textures baked in</span>
@@ -630,10 +853,11 @@ export function initObjHomeEditor(options = {}) {
       </div>
       <div class="obj-home-row">
         <label></label>
-        <button id="objHomeLoadGlbBtn" type="button" style="width:100%">Load GLB</button>
+        <button id="objHomeLoadGlbBtn" type="button" style="width:100%">Add Polygon (GLB)</button>
       </div>
     </div>
 
+    <!-- OBJ upload -->
     <div class="obj-home-section">
       <div class="obj-home-row" style="font-size:11px;color:rgba(255,255,255,0.55);margin-bottom:6px;">
         <label></label><span>OBJ + MTL (textures must be served over HTTP)</span>
@@ -652,10 +876,11 @@ export function initObjHomeEditor(options = {}) {
       </div>
       <div class="obj-home-row">
         <label></label>
-        <button id="objHomeLoadFilesBtn" type="button" style="width:100%">Load OBJ files</button>
+        <button id="objHomeLoadFilesBtn" type="button" style="width:100%">Add Polygon (OBJ)</button>
       </div>
     </div>
 
+    <!-- URL upload -->
     <div class="obj-home-section">
       <div class="obj-home-row">
         <label>OBJ URL</label>
@@ -671,10 +896,11 @@ export function initObjHomeEditor(options = {}) {
       </div>
       <div class="obj-home-row">
         <label></label>
-        <button id="objHomeLoadUrlBtn" type="button" style="width:100%">Load URL</button>
+        <button id="objHomeLoadUrlBtn" type="button" style="width:100%">Add Polygon (URL)</button>
       </div>
     </div>
 
+    <!-- Transform controls -->
     <div class="obj-home-section">
       <div class="obj-home-row">
         <label></label>
@@ -738,9 +964,11 @@ export function initObjHomeEditor(options = {}) {
   `;
   document.body.appendChild(ui.panel);
 
+  // --- Wire up UI element references ---
   ui.status = ui.panel.querySelector('#objHomeStatus');
+  ui.title = ui.panel.querySelector('#objHomeTitle');
+  ui.polyList = ui.panel.querySelector('#objHomePolygonList');
 
-  // Inputs & buttons
   const glbFileEl = ui.panel.querySelector('#objHomeGlbFile');
   const loadGlbBtn = ui.panel.querySelector('#objHomeLoadGlbBtn');
   const objFileEl = ui.panel.querySelector('#objHomeObjFile');
@@ -766,7 +994,7 @@ export function initObjHomeEditor(options = {}) {
   ui.scale = ui.panel.querySelector('#objHomeScale');
 
   const brightnessSlider = ui.panel.querySelector('#objHomeBrightness');
-  const brightnessVal = ui.panel.querySelector('#objHomeBrightnessVal');
+  const brightnessValEl = ui.panel.querySelector('#objHomeBrightnessVal');
 
   ui.applyBtn = ui.panel.querySelector('#objHomeApplyBtn');
   ui.resetBtn = ui.panel.querySelector('#objHomeResetBtn');
@@ -776,9 +1004,9 @@ export function initObjHomeEditor(options = {}) {
   const modeT = ui.panel.querySelector('#objHomeModeT');
   const modeR = ui.panel.querySelector('#objHomeModeR');
   const modeS = ui.panel.querySelector('#objHomeModeS');
-
   const closeBtn = ui.panel.querySelector('.obj-home-close');
 
+  // --- Mode button highlight ---
   const updateModeButtons = () => {
     const is = (m) => state.gizmoMode === m;
     modeT.style.opacity = is('translate') ? '1' : '0.6';
@@ -786,88 +1014,71 @@ export function initObjHomeEditor(options = {}) {
     modeS.style.opacity = is('scale') ? '1' : '0.6';
   };
 
+  // --- Event listeners ---
   closeBtn.addEventListener('click', () => setOpen(false));
   ui.toggle.addEventListener('click', () => setOpen(!state.open));
 
-  recenterEl.addEventListener('change', () => {
-    state.recenter.center = recenterEl.checked;
-  });
-  groundEl.addEventListener('change', () => {
-    state.recenter.ground = groundEl.checked;
-  });
+  recenterEl.addEventListener('change', () => { state.recenter.center = recenterEl.checked; });
+  groundEl.addEventListener('change', () => { state.recenter.ground = groundEl.checked; });
 
   ui.gizmoToggle.addEventListener('change', () => {
     state.gizmoEnabled = ui.gizmoToggle.checked;
     attachGizmoIfNeeded();
   });
-  modeT.addEventListener('click', () => {
-    state.gizmoMode = 'translate';
-    updateModeButtons();
-    attachGizmoIfNeeded();
-  });
-  modeR.addEventListener('click', () => {
-    state.gizmoMode = 'rotate';
-    updateModeButtons();
-    attachGizmoIfNeeded();
-  });
-  modeS.addEventListener('click', () => {
-    state.gizmoMode = 'scale';
-    updateModeButtons();
-    attachGizmoIfNeeded();
-  });
+  modeT.addEventListener('click', () => { state.gizmoMode = 'translate'; updateModeButtons(); attachGizmoIfNeeded(); });
+  modeR.addEventListener('click', () => { state.gizmoMode = 'rotate'; updateModeButtons(); attachGizmoIfNeeded(); });
+  modeS.addEventListener('click', () => { state.gizmoMode = 'scale'; updateModeButtons(); attachGizmoIfNeeded(); });
 
   if (brightnessSlider) {
     brightnessSlider.addEventListener('input', () => {
       const val = parseFloat(brightnessSlider.value);
-      state.brightness = Number.isFinite(val) ? val : 1;
-      if (brightnessVal) brightnessVal.textContent = state.brightness.toFixed(1);
-      applyBrightness(state.modelGroup, state.brightness);
+      const brightness = Number.isFinite(val) ? val : 1;
+      if (brightnessValEl) brightnessValEl.textContent = brightness.toFixed(1);
+      const poly = state.polygons[state.activeIndex];
+      if (poly) {
+        poly.brightness = brightness;
+        applyBrightness(poly.group, brightness);
+      }
     });
   }
 
   loadGlbBtn.addEventListener('click', async () => {
     const glbFile = glbFileEl.files && glbFileEl.files[0];
-    if (!glbFile) {
-      setStatus('Pick a GLB or GLTF file first.');
-      return;
-    }
+    if (!glbFile) { setStatus('Pick a GLB or GLTF file first.'); return; }
     const buffer = await readFileAsArrayBuffer(glbFile);
     await loadFromGlbBuffer(buffer, glbFile.name);
+    glbFileEl.value = '';
   });
 
   loadFilesBtn.addEventListener('click', async () => {
     const objFile = objFileEl.files && objFileEl.files[0];
     const mtlFile = mtlFileEl.files && mtlFileEl.files[0];
-    if (!objFile) {
-      setStatus('Pick an OBJ file first.');
-      return;
-    }
+    if (!objFile) { setStatus('Pick an OBJ file first.'); return; }
     await loadFromFiles(objFile, mtlFile, baseFileEl.value.trim());
+    objFileEl.value = '';
+    mtlFileEl.value = '';
   });
 
   loadUrlBtn.addEventListener('click', async () => {
     const objUrl = objUrlEl.value.trim();
     const mtlUrl = mtlUrlEl.value.trim();
-    if (!objUrl) {
-      setStatus('Paste an OBJ URL first.');
-      return;
-    }
+    if (!objUrl) { setStatus('Paste an OBJ URL first.'); return; }
     await loadFromUrls(objUrl, mtlUrl || '', baseUrlEl.value.trim());
   });
 
   ui.applyBtn.addEventListener('click', applyInputsToObject);
   ui.resetBtn.addEventListener('click', resetTransform);
   ui.copyBtn.addEventListener('click', copyConfigJson);
+
   ui.removeBtn.addEventListener('click', () => {
-    if (!state.modelGroup) return;
-    if (!confirm('Remove the home model from the scene?')) return;
-    removeModel();
+    if (state.activeIndex < 0) return;
+    removePolygon(state.activeIndex);
   });
 
   const alignBtn = ui.panel.querySelector('#objHomeAlignBtn');
   alignBtn.addEventListener('click', () => {
-    const obj = state.modelGroup;
-    if (!obj) { setStatus('Load a model first.'); return; }
+    const obj = activeGroup();
+    if (!obj) { setStatus('Select and unlock a polygon first.'); return; }
     obj.position.set(-0.144, -0.370, -0.395);
     obj.rotation.set(MathUtils.degToRad(-177.7), MathUtils.degToRad(-57), MathUtils.degToRad(-177.3));
     obj.scale.setScalar(0.008);
@@ -876,29 +1087,36 @@ export function initObjHomeEditor(options = {}) {
     setStatus('Aligned model to saved coordinates.');
   });
 
-  // Initial UI state
+  // --- Initial state ---
   updateModeButtons();
-  setStatus('Load an OBJ (file or URL), then move/rotate/scale to align.');
+  renderPolygonList();
   syncInputsFromObject();
+  setStatus('Add a polygon using the file inputs below.');
   setOpen(false);
 
-  // Expose for debugging
+  // --- Debug helper ---
   window.__homeModel = {
-    get object() {
-      return state.modelGroup;
+    get polygons() { return state.polygons; },
+    get activePolygon() { return state.polygons[state.activeIndex] || null; },
+    removeAll() {
+      [...state.polygons].forEach((p) => scene.remove(p.group));
+      state.polygons.length = 0;
+      state.activeIndex = -1;
+      renderPolygonList();
+      syncInputsFromObject();
+      updatePanelTitle();
     },
-    remove: removeModel,
     copyConfig: copyConfigJson
   };
 
   return {
     setOpen,
-    removeModel,
+    removePolygon,
     copyConfigJson,
     loadFromUrls,
     loadFromGlbBuffer,
     applyTransform(cfg) {
-      const obj = state.modelGroup;
+      const obj = activeGroup();
       if (!obj || !cfg) return;
       if (cfg.position) {
         if (Number.isFinite(cfg.position.x)) obj.position.x = cfg.position.x;
@@ -912,8 +1130,9 @@ export function initObjHomeEditor(options = {}) {
       }
       if (Number.isFinite(cfg.scale)) obj.scale.setScalar(cfg.scale);
       if (Number.isFinite(cfg.brightness)) {
-        state.brightness = cfg.brightness;
-        applyBrightness(obj, state.brightness);
+        const poly = state.polygons[state.activeIndex];
+        if (poly) poly.brightness = cfg.brightness;
+        applyBrightness(obj, cfg.brightness);
       }
       syncInputsFromObject();
       attachGizmoIfNeeded();
@@ -921,4 +1140,3 @@ export function initObjHomeEditor(options = {}) {
     getState() { return state; }
   };
 }
-
