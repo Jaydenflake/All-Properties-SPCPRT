@@ -345,18 +345,47 @@ function convertToUnlitMaterials(object) {
   });
 }
 
-function applyBrightness(object, brightness) {
-  if (!object) return;
-  const c = clamp(brightness, 0, 3);
+/** @param {import('three').Object3D} object */
+function configureGlbPbrMaterials(object) {
   object.traverse((child) => {
+    if (!(child instanceof Mesh)) return;
+    child.castShadow = false;
+    child.receiveShadow = false;
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach((m) => {
+      if (!m) return;
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        m.__pbrColor0 = m.color ? m.color.clone() : new Color(1, 1, 1);
+        m.__pbrEnv0 = Number.isFinite(m.envMapIntensity) ? m.envMapIntensity : 1.0;
+        if (m.envMapIntensity == null) m.envMapIntensity = 1.0;
+      } else {
+        m.__pbrColor0 = m.color ? m.color.clone() : new Color(1, 1, 1);
+      }
+    });
+  });
+}
+
+/**
+ * Per-polygon appearance: color × brightness, envMapIntensity = base × poly.envMap × brightness (PBR only).
+ * @param {{ group: import('three').Object3D, brightness: number, envMapIntensity: number } | null} poly
+ */
+function applyPolygonAppearance(poly) {
+  if (!poly || !poly.group) return;
+  const b = clamp(Number.isFinite(poly.brightness) ? poly.brightness : 1, 0, 3);
+  const ev = clamp(Number.isFinite(poly.envMapIntensity) ? poly.envMapIntensity : 1, 0, 3);
+  poly.group.traverse((child) => {
     if (!(child instanceof Mesh)) return;
     const mats = Array.isArray(child.material) ? child.material : [child.material];
     mats.forEach((m) => {
       if (!m) return;
-      if (!m.__origColor) {
-        m.__origColor = m.color ? m.color.clone() : new Color(1, 1, 1);
+      if (m.__pbrColor0 == null) {
+        m.__pbrColor0 = m.color ? m.color.clone() : new Color(1, 1, 1);
       }
-      m.color.copy(m.__origColor).multiplyScalar(c);
+      m.color.copy(m.__pbrColor0).multiplyScalar(b);
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        if (m.__pbrEnv0 == null) m.__pbrEnv0 = Number.isFinite(m.envMapIntensity) ? m.envMapIntensity : 1.0;
+        m.envMapIntensity = m.__pbrEnv0 * ev * b;
+      }
     });
   });
 }
@@ -378,7 +407,10 @@ function computeAndApplyRecenter(object, { center = true, groundToZero = true } 
 }
 
 export function initObjHomeEditor(options = {}) {
-  const { scene, camera, controls, renderer, propertyLabel = 'property' } = options;
+  const {
+    scene, camera, controls, renderer, propertyLabel = 'property',
+    onApplyPersist, onClearHomePersist
+  } = options;
   if (!scene || !camera || !controls || !renderer?.domElement) {
     console.warn('obj-home-editor: scene, camera, controls, and renderer.domElement are required.');
     return {};
@@ -390,7 +422,7 @@ export function initObjHomeEditor(options = {}) {
   // --- State ---
   const state = {
     open: false,
-    polygons: [],       // array of { id, name, group, locked, brightness, source }
+    polygons: [],       // array of { id, name, group, locked, brightness, envMapIntensity, source }
     activeIndex: -1,    // index into state.polygons of the currently-editing polygon
     nextId: 1,          // auto-increment for "Polygon N" naming
     recenter: { center: true, ground: true },
@@ -504,11 +536,14 @@ export function initObjHomeEditor(options = {}) {
     }
     state.activeIndex = index;
 
-    // Update brightness slider to this polygon's brightness
     const bs = ui.panel.querySelector('#objHomeBrightness');
     const bv = ui.panel.querySelector('#objHomeBrightnessVal');
+    const eis = ui.panel.querySelector('#objHomeEnvMapIntensity');
+    const eiv = ui.panel.querySelector('#objHomeEnvMapIntensityVal');
     if (bs) bs.value = poly.brightness;
     if (bv) bv.textContent = poly.brightness.toFixed(1);
+    if (eis) eis.value = poly.envMapIntensity;
+    if (eiv) eiv.textContent = Number(poly.envMapIntensity).toFixed(2);
 
     syncInputsFromObject();
     attachGizmoIfNeeded();
@@ -581,6 +616,14 @@ export function initObjHomeEditor(options = {}) {
       if (ui.copyBtn) ui.copyBtn.disabled = false; // still allow copy all
       if (ui.resetBtn) ui.resetBtn.disabled = true;
       if (ui.gizmoToggle) ui.gizmoToggle.checked = false;
+      const bs = ui.panel?.querySelector('#objHomeBrightness');
+      const bv = ui.panel?.querySelector('#objHomeBrightnessVal');
+      const eis = ui.panel?.querySelector('#objHomeEnvMapIntensity');
+      const eiv = ui.panel?.querySelector('#objHomeEnvMapIntensityVal');
+      if (bs) bs.value = 1.0;
+      if (bv) bv.textContent = '1.0';
+      if (eis) eis.value = 1.0;
+      if (eiv) eiv.textContent = '1.0';
       state.gizmoEnabled = false;
       attachGizmoIfNeeded();
       return;
@@ -619,7 +662,17 @@ export function initObjHomeEditor(options = {}) {
       obj.scale.setScalar(ss);
     }
     attachGizmoIfNeeded();
-    setStatus('Applied transform.');
+    if (typeof onApplyPersist === 'function') {
+      try {
+        onApplyPersist();
+        setStatus('Applied transform. Settings saved for next visit.');
+      } catch (e) {
+        console.warn('onApplyPersist', e);
+        setStatus('Applied transform. (Save failed; see console.)');
+      }
+    } else {
+      setStatus('Applied transform.');
+    }
   }
 
   function resetTransform() {
@@ -642,6 +695,7 @@ export function initObjHomeEditor(options = {}) {
       group,
       locked: false,
       brightness: brightnessVal ?? 1.0,
+      envMapIntensity: 1.0,
       source
     };
     state.polygons.push(poly);
@@ -658,22 +712,26 @@ export function initObjHomeEditor(options = {}) {
         const group = new Group();
         group.name = `polygon-${state.nextId}-${propertyLabel}`;
         group.add(gltf.scene || gltf.scenes[0]);
-        convertToUnlitMaterials(group);
-        applyBrightness(group, 1.0);
+        configureGlbPbrMaterials(group);
         computeAndApplyRecenter(group, { center: state.recenter.center, groundToZero: state.recenter.ground });
         scene.add(group);
         const idx = createPolygon(group, { type: 'glb', obj: sourceLabel, mtl: '', baseUrl: '' }, 1.0);
+        const loadedPoly = state.polygons[idx];
+        applyPolygonAppearance(loadedPoly);
         state.activeIndex = idx;
         renderPolygonList();
         updatePanelTitle();
         syncInputsFromObject();
         attachGizmoIfNeeded();
 
-        // Sync brightness slider
         const bs = ui.panel.querySelector('#objHomeBrightness');
         const bv = ui.panel.querySelector('#objHomeBrightnessVal');
+        const eis = ui.panel.querySelector('#objHomeEnvMapIntensity');
+        const eiv = ui.panel.querySelector('#objHomeEnvMapIntensityVal');
         if (bs) bs.value = 1.0;
         if (bv) bv.textContent = '1.0';
+        if (eis) eis.value = 1.0;
+        if (eiv) eiv.textContent = '1.0';
 
         setStatus(`Loaded ${state.polygons[idx].name} (${sourceLabel}). Use gizmo or fields to align.`);
         resolve();
@@ -723,11 +781,11 @@ export function initObjHomeEditor(options = {}) {
       } else {
         applyDefaultMaterial(group);
       }
-      applyBrightness(group, 1.0);
       computeAndApplyRecenter(group, { center: state.recenter.center, groundToZero: state.recenter.ground });
 
       scene.add(group);
       const idx = createPolygon(group, { type: 'obj', obj: sourceLabel, mtl: '', baseUrl: baseUrl || '' }, 1.0);
+      applyPolygonAppearance(state.polygons[idx]);
       state.activeIndex = idx;
       renderPolygonList();
       updatePanelTitle();
@@ -736,8 +794,12 @@ export function initObjHomeEditor(options = {}) {
 
       const bs = ui.panel.querySelector('#objHomeBrightness');
       const bv = ui.panel.querySelector('#objHomeBrightnessVal');
+      const eis = ui.panel.querySelector('#objHomeEnvMapIntensity');
+      const eiv = ui.panel.querySelector('#objHomeEnvMapIntensityVal');
       if (bs) bs.value = 1.0;
       if (bv) bv.textContent = '1.0';
+      if (eis) eis.value = 1.0;
+      if (eiv) eiv.textContent = '1.0';
 
       setStatus(`Loaded ${state.polygons[idx].name} (${sourceLabel}). Use gizmo or fields to align.`);
     } catch (err) {
@@ -756,6 +818,10 @@ export function initObjHomeEditor(options = {}) {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const buffer = await resp.arrayBuffer();
         await loadFromGlbBuffer(buffer, objUrl.split('/').pop());
+        const justLoaded = state.polygons[state.activeIndex];
+        if (justLoaded && justLoaded.source) {
+          justLoaded.source.url = objUrl;
+        }
       } catch (err) {
         console.warn(err);
         setStatus('Failed to fetch GLB. Check the URL and CORS settings.');
@@ -768,6 +834,11 @@ export function initObjHomeEditor(options = {}) {
       mtlUrl ? fetch(mtlUrl).then((r) => r.text()) : Promise.resolve('')
     ]);
     await loadFromTexts({ objText, mtlText, baseUrl, sourceLabel: 'URL' });
+    const justLoaded = state.polygons[state.activeIndex];
+    if (justLoaded && justLoaded.source) {
+      justLoaded.source.url = objUrl;
+      justLoaded.source.mtlUrl = mtlUrl || '';
+    }
   }
 
   async function loadFromFiles(objFile, mtlFile, baseUrl) {
@@ -804,6 +875,7 @@ export function initObjHomeEditor(options = {}) {
           scale: +obj.scale.x.toFixed(6)
         },
         brightness: poly.brightness,
+        envMapIntensity: Number.isFinite(poly.envMapIntensity) ? poly.envMapIntensity : 1,
         recenter: { center: !!state.recenter.center, groundToZero: !!state.recenter.ground }
       };
     });
@@ -993,6 +1065,11 @@ export function initObjHomeEditor(options = {}) {
         <input id="objHomeBrightness" type="range" min="0" max="3" step="0.05" value="1" style="flex:1;accent-color:#fff;">
         <span id="objHomeBrightnessVal" style="min-width:32px;text-align:right;font-size:11px;">1.0</span>
       </div>
+      <div class="obj-home-row" style="align-items:center;">
+        <label for="objHomeEnvMapIntensity" style="min-width:68px;">Env IBL</label>
+        <input id="objHomeEnvMapIntensity" type="range" min="0" max="2" step="0.05" value="1" style="flex:1;accent-color:#fff;" title="Reflection / environment strength (PBR models)">
+        <span id="objHomeEnvMapIntensityVal" style="min-width:32px;text-align:right;font-size:11px;">1.0</span>
+      </div>
 
       <div class="obj-home-actions">
         <button id="objHomeApplyBtn" type="button">Apply</button>
@@ -1005,6 +1082,9 @@ export function initObjHomeEditor(options = {}) {
       </div>
       <div class="obj-home-actions" style="margin-top:6px;">
         <button id="objHomeExportAllBtn" type="button" style="flex:1 1 100%;background:rgba(66,133,244,0.35);border-color:rgba(66,133,244,0.5);">Export All (Splat + Clip + Polygons)</button>
+      </div>
+      <div class="obj-home-actions" style="margin-top:4px;" id="objHomePersistRow">
+        <button id="objHomeClearSavedBtn" type="button" style="flex:1 1 100%;font-size:11px;opacity:0.88;">Clear saved (reload with project JSON)</button>
       </div>
     </div>
   `;
@@ -1041,6 +1121,8 @@ export function initObjHomeEditor(options = {}) {
 
   const brightnessSlider = ui.panel.querySelector('#objHomeBrightness');
   const brightnessValEl = ui.panel.querySelector('#objHomeBrightnessVal');
+  const envMapSlider = ui.panel.querySelector('#objHomeEnvMapIntensity');
+  const envMapValEl = ui.panel.querySelector('#objHomeEnvMapIntensityVal');
 
   ui.applyBtn = ui.panel.querySelector('#objHomeApplyBtn');
   ui.resetBtn = ui.panel.querySelector('#objHomeResetBtn');
@@ -1083,7 +1165,20 @@ export function initObjHomeEditor(options = {}) {
       const poly = state.polygons[state.activeIndex];
       if (poly) {
         poly.brightness = brightness;
-        applyBrightness(poly.group, brightness);
+        applyPolygonAppearance(poly);
+      }
+    });
+  }
+
+  if (envMapSlider) {
+    envMapSlider.addEventListener('input', () => {
+      const val = parseFloat(envMapSlider.value);
+      const ev = Number.isFinite(val) ? val : 1;
+      if (envMapValEl) envMapValEl.textContent = ev.toFixed(2);
+      const poly = state.polygons[state.activeIndex];
+      if (poly) {
+        poly.envMapIntensity = ev;
+        applyPolygonAppearance(poly);
       }
     });
   }
@@ -1138,6 +1233,14 @@ export function initObjHomeEditor(options = {}) {
     copyExportAllJson();
   });
 
+  const clearSavedBtn = ui.panel.querySelector('#objHomeClearSavedBtn');
+  const clearSavedRow = ui.panel.querySelector('#objHomePersistRow');
+  if (typeof onClearHomePersist === 'function' && clearSavedBtn) {
+    clearSavedBtn.addEventListener('click', onClearHomePersist);
+  } else if (clearSavedRow) {
+    clearSavedRow.style.display = 'none';
+  }
+
   // --- Initial state ---
   updateModeButtons();
   renderPolygonList();
@@ -1183,10 +1286,22 @@ export function initObjHomeEditor(options = {}) {
         if (Number.isFinite(cfg.rotationDeg.z)) obj.rotation.z = MathUtils.degToRad(cfg.rotationDeg.z);
       }
       if (Number.isFinite(cfg.scale)) obj.scale.setScalar(cfg.scale);
-      if (Number.isFinite(cfg.brightness)) {
-        const poly = state.polygons[state.activeIndex];
-        if (poly) poly.brightness = cfg.brightness;
-        applyBrightness(obj, cfg.brightness);
+      const poly = state.polygons[state.activeIndex];
+      if (poly && Number.isFinite(cfg.brightness)) {
+        poly.brightness = cfg.brightness;
+        const bs = ui.panel?.querySelector('#objHomeBrightness');
+        const bv = ui.panel?.querySelector('#objHomeBrightnessVal');
+        if (bs) bs.value = poly.brightness;
+        if (bv) bv.textContent = poly.brightness.toFixed(1);
+        applyPolygonAppearance(poly);
+      }
+      if (poly && Number.isFinite(cfg.envMapIntensity)) {
+        poly.envMapIntensity = cfg.envMapIntensity;
+        const eis = ui.panel?.querySelector('#objHomeEnvMapIntensity');
+        const eiv = ui.panel?.querySelector('#objHomeEnvMapIntensityVal');
+        if (eis) eis.value = poly.envMapIntensity;
+        if (eiv) eiv.textContent = Number(poly.envMapIntensity).toFixed(2);
+        applyPolygonAppearance(poly);
       }
       syncInputsFromObject();
       attachGizmoIfNeeded();

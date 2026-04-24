@@ -1564,10 +1564,20 @@
     }
     </script>
     <script type="module">
-    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector2, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane, LineBasicMaterial, LineSegments, BufferGeometry, Float32BufferAttribute } from 'three';
+    import { WebGLRenderer, PerspectiveCamera, Scene, Color, Vector2, Vector3, SphereGeometry, CylinderGeometry, BoxGeometry, MeshBasicMaterial, Mesh, TextureLoader, PlaneGeometry, DoubleSide, MeshStandardMaterial, Texture, MathUtils, Matrix4, Raycaster, Plane, LineBasicMaterial, LineSegments, BufferGeometry, Float32BufferAttribute, ACESFilmicToneMapping, SRGBColorSpace, PMREMGenerator, DirectionalLight, HemisphereLight } from 'three';
 
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
     import { LumaSplatsThree } from '@lumaai/luma-web';
+
+    // PBR / IBL (GLB terrain & buildings) — add matching HDRI to /assets/ on your server
+    const PBR_LIT_CONFIG = {
+        hdrPath: '/assets/env-overcast-1k.hdr',
+        toneMappingExposure: 1.0,
+        sunDirection: new Vector3(5, 8, 3).normalize(),
+        sunIntensity: 0.7,
+        hemisphereIntensity: 0.25
+    };
 
     // Inlined from tap-focus-refinement.mjs (tap-to-focus geometry/sampling helpers)
     const HALF_FLOAT_SIGN_MASK = 0x8000;
@@ -1947,11 +1957,47 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(new Color(0x000000));
     renderer.setPixelRatio(Math.min(window.devicePixelRatio * 0.8, rendererPixelRatioCap));
+    renderer.outputColorSpace = SRGBColorSpace;
+    renderer.toneMapping = ACESFilmicToneMapping;
+    renderer.toneMappingExposure = PBR_LIT_CONFIG.toneMappingExposure;
     document.body.appendChild(renderer.domElement);
     const tapdotLabelsLayerEl = document.getElementById('tapdot-labels-layer');
     if (tapdotLabelsLayerEl) document.body.appendChild(tapdotLabelsLayerEl);
 
     let scene = new Scene();
+
+    (function initScenePbrIbl() {
+        const pmrem = new PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        new RGBELoader().load(
+            PBR_LIT_CONFIG.hdrPath,
+            (texture) => {
+                const envMap = pmrem.fromEquirectangular(texture).texture;
+                scene.environment = envMap;
+                scene.traverse((o) => {
+                    if (o.isMesh) {
+                        const mats = Array.isArray(o.material) ? o.material : [o.material];
+                        mats.forEach((mat) => { if (mat) mat.needsUpdate = true; });
+                    }
+                });
+                texture.dispose();
+                pmrem.dispose();
+            },
+            undefined,
+            (err) => {
+                console.warn('PBR: HDRI not loaded (add env-overcast-1k.hdr to /assets/). IBL will be missing until then.', err);
+                pmrem.dispose();
+            }
+        );
+        const hemi = new HemisphereLight(0x87ceeb, 0x2a2a2a, PBR_LIT_CONFIG.hemisphereIntensity);
+        scene.add(hemi);
+        const sun = new DirectionalLight(0xffffff, PBR_LIT_CONFIG.sunIntensity);
+        sun.position.copy(PBR_LIT_CONFIG.sunDirection).multiplyScalar(10);
+        sun.target.position.copy(parameters.scene.origin);
+        sun.target.updateMatrixWorld();
+        scene.add(sun);
+        scene.add(sun.target);
+    })();
 
     let camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, parameters.camera.maxZoomOut);
     camera.position.set(parameters.camera.startPosition.x, parameters.camera.startPosition.y, parameters.camera.startPosition.z);
@@ -2159,8 +2205,16 @@
             particleRevealEnabled: true,
             particleRevealDuration: holeConfig.revealDuration || 2.7
         });
-        if (holeSplat.material) {
-            holeSplat.material.depthTest = true;
+        {
+            const mats = holeSplat.material
+                ? (Array.isArray(holeSplat.material) ? holeSplat.material : [holeSplat.material])
+                : [];
+            mats.forEach((m) => {
+                if (m) {
+                    m.depthTest = true;
+                    m.toneMapped = false;
+                }
+            });
         }
         holeSplat.renderOrder = 999;
         applyColumnClip(holeSplat);
@@ -5780,7 +5834,8 @@
             "rotationDeg": { "x": -177.7, "y": -57, "z": -177.3 },
             "scale": 0.008
           },
-          "brightness": 1
+          "brightness": 1,
+          "envMapIntensity": 0.55
         },
         {
           "name": "Polygon 2",
@@ -5790,7 +5845,8 @@
             "rotationDeg": { "x": -177.7, "y": -57, "z": -177.3 },
             "scale": 0.008
           },
-          "brightness": 0.6
+          "brightness": 0.6,
+          "envMapIntensity": 1.0
         }
       ],
       "clipPolygons": [
@@ -5839,30 +5895,96 @@
     }
 
     // Home model editor (GLB import + transform UI) — loads each polygon from RENDERING_CONFIG
+    // Apply saves home polygon state to localStorage (per browser, per origin) for next visit.
+    const HOME_PERSIST_KEY = 'PMD-Rendering-Revised:homePolygonsV1';
+    function loadSavedHomePolygonsFromStorage() {
+        try {
+            const raw = localStorage.getItem(HOME_PERSIST_KEY);
+            if (!raw) return null;
+            const p = JSON.parse(raw);
+            if (p && p.v === 1 && Array.isArray(p.homePolygons) && p.homePolygons.length > 0) {
+                return p.homePolygons;
+            }
+        } catch (e) {
+            console.warn('loadSavedHomePolygonsFromStorage', e);
+        }
+        return null;
+    }
+    function saveHomePolygonsToStorage(homePolygons) {
+        if (!Array.isArray(homePolygons) || !homePolygons.length) return;
+        const body = { v: 1, homePolygons, savedAt: new Date().toISOString() };
+        try {
+            localStorage.setItem(HOME_PERSIST_KEY, JSON.stringify(body));
+        } catch (e) {
+            console.warn('saveHomePolygonsToStorage', e);
+            throw e;
+        }
+    }
     import('../shared/obj-home-editor.mjs').then(({ initObjHomeEditor }) => {
         window.__homeEditor = initObjHomeEditor({
             scene,
             camera,
             controls,
             renderer,
-            propertyLabel: 'PMD-Rendering-Revised'
+            propertyLabel: 'PMD-Rendering-Revised',
+            onApplyPersist: () => {
+                if (window.__homeEditor.getPolygonsPayload) {
+                    saveHomePolygonsToStorage(window.__homeEditor.getPolygonsPayload());
+                }
+            },
+            onClearHomePersist: () => {
+                try { localStorage.removeItem(HOME_PERSIST_KEY); } catch (e) { /* ignore */ }
+                location.reload();
+            }
         });
 
         if (RENDERING_CONFIG && Array.isArray(RENDERING_CONFIG.homePolygons)) {
             (async () => {
-                for (const poly of RENDERING_CONFIG.homePolygons) {
-                    const url = poly.source && poly.source.url;
-                    if (!url) continue;
+                const savedList = loadSavedHomePolygonsFromStorage();
+                const homeList = savedList ?? RENDERING_CONFIG.homePolygons;
+                const configUrls = (RENDERING_CONFIG.homePolygons || [])
+                    .map((p) => p && p.source && p.source.url)
+                    .filter(Boolean);
+                const urlByBasename = new Map(
+                    configUrls.map((u) => [String(u).split('/').pop().toLowerCase(), u])
+                );
+                const resolvePolygonUrl = (poly) => {
+                    const direct = poly && poly.source && poly.source.url;
+                    if (direct) return direct;
+                    const basename = (poly && poly.source && poly.source.obj) ? String(poly.source.obj).toLowerCase() : '';
+                    if (basename && urlByBasename.has(basename)) return urlByBasename.get(basename);
+                    if (poly && poly.name) {
+                        const byName = (RENDERING_CONFIG.homePolygons || []).find((p) => p.name === poly.name);
+                        if (byName && byName.source && byName.source.url) return byName.source.url;
+                    }
+                    return '';
+                };
+                let loadedAny = false;
+                for (const poly of homeList) {
+                    const url = resolvePolygonUrl(poly);
+                    if (!url) {
+                        console.warn('Home polygon has no source URL and could not be matched; skipping.', poly);
+                        continue;
+                    }
                     try {
                         await window.__homeEditor.loadFromUrls(url, '', '');
                         window.__homeEditor.applyTransform({
                             position: poly.transform && poly.transform.position,
                             rotationDeg: poly.transform && poly.transform.rotationDeg,
                             scale: poly.transform && poly.transform.scale,
-                            brightness: poly.brightness
+                            brightness: poly.brightness,
+                            envMapIntensity: poly.envMapIntensity
                         });
+                        loadedAny = true;
                     } catch (err) {
                         console.warn(`Failed to load ${poly.name || url}:`, err);
+                    }
+                }
+                if (savedList && loadedAny) {
+                    try {
+                        saveHomePolygonsToStorage(window.__homeEditor.getPolygonsPayload());
+                    } catch (e) {
+                        console.warn('Could not re-save home polygons with resolved URLs.', e);
                     }
                 }
             })();
