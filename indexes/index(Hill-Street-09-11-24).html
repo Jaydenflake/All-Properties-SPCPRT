@@ -184,27 +184,10 @@ const hotspotConfigurations = [
 
 
 	// Centralized control section for BorderDots and BorderLines
-const borderDotPositions = [
-    { name: 'BorderDot_1', position: { x: 0.08, y: -0.917, z: -0.15 } },
-    { name: 'BorderDot_2', position: { x: 0.14, y: -0.917, z: -0.08 } },
-    { name: 'BorderDot_3', position: { x: 0.14, y: -0.907, z: 0.07 } },
-    { name: 'BorderDot_4', position: { x: -0.18, y: -0.87, z: 0.6 } },
-    { name: 'BorderDot_5', position: { x: -0.5, y: -0.92, z: -0.08 } },
-    { name: 'BorderDot_6', position: { x: 0, y: -0.917, z: -0.27 } },
-    
-    // Add more BorderDots here by simply adding more objects
-];
+	// Lot lines intentionally disabled for Hill Street; leave arrays empty to skip creation.
+const borderDotPositions = [];
 
-const borderLineConnections = [
-    { start: 'BorderDot_1', end: 'BorderDot_2' },
-    { start: 'BorderDot_2', end: 'BorderDot_3' },
-	{ start: 'BorderDot_3', end: 'BorderDot_4' },
-	{ start: 'BorderDot_4', end: 'BorderDot_5' },
-	{ start: 'BorderDot_5', end: 'BorderDot_6' },
-	{ start: 'BorderDot_6', end: 'BorderDot_1' },
-
-    // Add more BorderLine connections here
-];
+const borderLineConnections = [];
 
 
 
