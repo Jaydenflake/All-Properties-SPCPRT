@@ -6,7 +6,7 @@ This folder contains a reusable module that adds **flight path** (camera path) a
 
 - **Flight path**: Catmull-Rom interpolated camera path with position + look-at per checkpoint and configurable duration, speed, and loop.
 - **Editor UI**: "Path" toggle (top-right), panel with checkpoint strip (capture, play/pause, overwrite, delete, go to checkpoint), and "Copy JSON" export.
-- **Record button**: In the property’s menu bar; records the first 20 seconds of the path animation to a WebM file and downloads it (UI is hidden during recording).
+- **Record button**: In the property’s menu bar; records **one full path playthrough** (segment durations + pauses, divided by the current path speed) to a WebM file and downloads it (UI is hidden during recording).
 
 ## Usage (add to a property index)
 

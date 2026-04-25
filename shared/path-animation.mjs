@@ -342,6 +342,27 @@ export function initPathAnimation(options = {}) {
     syncUI();
   }
 
+  function getTotalPathSeconds() {
+    const c = pathState.checkpoints;
+    if (!c.length) return 0;
+    if (c.length === 1) return Math.max(0.1, c[0].duration || 5);
+    const n = pathState.loop ? c.length : c.length - 1;
+    let total = 0;
+    for (let i = 0; i < n; i++) total += Math.max(0.1, c[i].duration || 5);
+    for (let i = 0; i < c.length; i++) {
+      if (c[i].pauseAt) total += Math.max(0, c[i].pauseDuration ?? 1);
+    }
+    return total;
+  }
+
+  /** Wall-clock time for one playthrough, matching the path animation (segment times ÷ path speed). */
+  function getPathRecordDurationMs() {
+    const pathSec = getTotalPathSeconds();
+    const speed = Math.max(0.1, pathState.speed || 1);
+    const realSec = pathSec / speed;
+    return Math.max(100, Math.round(realSec * 1000));
+  }
+
   const recordFormats = [
     { id: 'desktop', label: 'Desktop', ratio: 'Current', width: 0, height: 0, iconW: 36, iconH: 22 },
     { id: 'square', label: 'Square', ratio: '1:1', width: 1080, height: 1080, iconW: 26, iconH: 26 },
@@ -366,15 +387,20 @@ export function initPathAnimation(options = {}) {
             </button>
           `).join('')}
         </div>
-        <div class="record-format-duration-row">
-          <label for="recordFormatDuration">Duration</label>
-          <input id="recordFormatDuration" type="number" min="5" max="120" step="5" value="20">
-          <span>seconds</span>
+        <div class="record-format-duration-row" id="recordPathLengthRow" style="flex-direction:column;align-items:center;gap:6px;">
+          <span id="recordPathLengthHint" style="font-size:12px;color:rgba(255,255,255,0.78);text-align:center;line-height:1.45;max-width:100%;">Loading…</span>
         </div>
         <button type="button" class="record-format-cancel">Cancel</button>
       </div>
     `;
     document.body.appendChild(overlay);
+    const pathSec = getTotalPathSeconds();
+    const sp = pathState.speed || 1;
+    const hint = overlay.querySelector('#recordPathLengthHint');
+    if (hint) {
+      const ms = getPathRecordDurationMs();
+      hint.textContent = `Records one full path: ~${(ms / 1000).toFixed(1)}s (path is ${pathSec.toFixed(1)}s of segments + pauses at ${sp}× speed).`;
+    }
     requestAnimationFrame(() => overlay.classList.add('active'));
 
     function dismiss() {
@@ -389,11 +415,10 @@ export function initPathAnimation(options = {}) {
       btn.addEventListener('click', () => {
         const formatId = btn.getAttribute('data-format-id');
         const format = recordFormats.find((f) => f.id === formatId);
-        const durInput = overlay.querySelector('#recordFormatDuration');
-        const durationSec = Math.max(5, Math.min(120, parseFloat(durInput.value) || 20));
+        const durationMs = getPathRecordDurationMs();
         dismiss();
         if (format && typeof onSelect === 'function') {
-          onSelect(format, durationSec * 1000);
+          onSelect(format, durationMs);
         }
       });
     });
@@ -598,19 +623,6 @@ export function initPathAnimation(options = {}) {
 
   function setStatus(msg) {
     if (statusEl) statusEl.textContent = msg || '';
-  }
-
-  function getTotalPathSeconds() {
-    const c = pathState.checkpoints;
-    if (!c.length) return 0;
-    if (c.length === 1) return Math.max(0.1, c[0].duration || 5);
-    const n = pathState.loop ? c.length : c.length - 1;
-    let total = 0;
-    for (let i = 0; i < n; i++) total += Math.max(0.1, c[i].duration || 5);
-    for (let i = 0; i < c.length; i++) {
-      if (c[i].pauseAt) total += Math.max(0, c[i].pauseDuration ?? 1);
-    }
-    return total;
   }
 
   function syncSelectedIndex() {
