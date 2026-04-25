@@ -6,7 +6,7 @@
  *
  * Usage:
  *   import { initPathAnimation } from './path-animation.mjs';
- *   const pa = initPathAnimation({ camera, controls, renderer, sceneOrigin, startPosition, menuContainer, initialPath, propertyLabel });
+ *   const pa = initPathAnimation({ camera, controls, renderer, sceneOrigin, startPosition, menuContainer, initialPath, propertyLabel, onRecordStart });
  *   // In your animate loop: pa.update(deltaSeconds);
  */
 
@@ -54,7 +54,8 @@ export function initPathAnimation(options = {}) {
     menuContainer,
     initialPath = {},
     paths: pathsOption,
-    propertyLabel = 'property'
+    propertyLabel = 'property',
+    onRecordStart
   } = options;
 
   if (!camera || !controls || !renderer?.domElement) {
@@ -1175,7 +1176,11 @@ export function initPathAnimation(options = {}) {
             formatWidth: format.width,
             formatHeight: format.height,
             formatLabel: format.id === 'desktop' ? '' : format.id,
-            onBefore: () => {},
+            onBefore: () => {
+              if (typeof onRecordStart === 'function') {
+                try { onRecordStart(); } catch (e) { console.warn('onRecordStart failed', e); }
+              }
+            },
             onAfter: () => document.body.classList.remove('recording-mode')
           });
         });

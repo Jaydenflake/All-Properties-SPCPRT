@@ -3017,6 +3017,25 @@
 
     let lastAnimationFrameTime = performance.now();
 
+    function replaySplatReveal() {
+        const idx = activeHoleIndex;
+        const cfg = holeConfigurations[idx];
+        if (!cfg) return;
+        const prev = holeSplats[idx];
+        if (!prev) {
+            ensureHoleSplat(idx);
+            return;
+        }
+        scene.remove(prev);
+        if (typeof prev.dispose === 'function') { try { prev.dispose(); } catch (e) { /* best-effort */ } }
+        const fresh = createHoleSplat(cfg);
+        holeSplats[idx] = fresh;
+        holeSplats.forEach((hs, i) => {
+            if (!hs) return;
+            hs.visible = i === activeHoleIndex;
+        });
+    }
+
     // Path animation (flight path + editor + recording) - shared module
     import('../shared/path-animation.mjs').then(({ initPathAnimation }) => {
         const menuContainerEl = document.getElementById('menuContainer');
@@ -3038,7 +3057,8 @@
             startPosition: parameters.camera.startPosition,
             menuContainer: menuContainerEl,
             paths: pathsConfig,
-            propertyLabel: 'Copper-Rock'
+            propertyLabel: 'Copper-Rock',
+            onRecordStart: replaySplatReveal
         });
         const firstPath = window.__pathAnimation.getState();
         if (firstPath.enabled && firstPath.pathState && firstPath.pathState.checkpoints.length > 1) {

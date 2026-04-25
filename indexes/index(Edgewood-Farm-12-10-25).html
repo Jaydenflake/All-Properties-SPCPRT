@@ -1290,6 +1290,50 @@
         // Optional: ensure both remain visible; controls below can toggle visibility separately if needed
     }
 
+    function replaySplatReveal() {
+        const v1 = splat.visible;
+        const v2 = splat2.visible;
+        const p1 = splat.position.clone();
+        const r1 = splat.rotation.clone();
+        const s1 = splat.scale.clone();
+        const p2 = splat2.position.clone();
+        const r2 = splat2.rotation.clone();
+        const s2 = splat2.scale.clone();
+        scene.remove(splat);
+        if (typeof splat.dispose === 'function') { try { splat.dispose(); } catch (e) { /* best-effort */ } }
+        scene.remove(splat2);
+        if (typeof splat2.dispose === 'function') { try { splat2.dispose(); } catch (e) { /* best-effort */ } }
+        splat = new LumaSplatsThree({
+            source: splatConfigs.splat1.source,
+            particleRevealEnabled: true,
+            particleRevealDuration: 3.33
+        });
+        splat.material.depthTest = true;
+        splat.renderOrder = 999;
+        splat.position.copy(p1);
+        splat.rotation.copy(r1);
+        splat.scale.copy(s1);
+        splat.visible = v1;
+        scene.add(splat);
+        applySplatCulling(splat, splatConfigs.splat1.culling.radius, splatConfigs.splat1.culling.mode);
+        splat2 = new LumaSplatsThree({
+            source: splatConfigs.splat2.source,
+            particleRevealEnabled: true,
+            particleRevealDuration: 3.33
+        });
+        splat2.material.depthTest = true;
+        splat2.renderOrder = 999;
+        splat2.position.copy(p2);
+        splat2.rotation.copy(r2);
+        splat2.scale.copy(s2);
+        splat2.visible = v2;
+        scene.add(splat2);
+        applySplatCulling(splat2, splatConfigs.splat2.culling.radius, splatConfigs.splat2.culling.mode);
+        splats.splat1 = splat;
+        splats.splat2 = splat2;
+        applyBackgroundOwner(backgroundOwner);
+    }
+
     // Wire UI controls
     const panelBindings = [
         { id: 'splat1', radiusEl: 'splat1Radius', radiusNumEl: 'splat1RadiusNum', modeEl: 'splat1Mode', scaleEl: 'splat1Scale', scaleNumEl: 'splat1ScaleNum' },
@@ -2033,7 +2077,8 @@
             sceneOrigin: parameters.scene.origin,
             startPosition: parameters.camera.startPosition,
             menuContainer: menuContainerEl,
-            propertyLabel: 'Edgewood-Farm'
+            propertyLabel: 'Edgewood-Farm',
+            onRecordStart: replaySplatReveal
         });
     }).catch(err => console.warn('Path animation failed to load', err));
 

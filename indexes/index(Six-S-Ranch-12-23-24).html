@@ -513,6 +513,31 @@
         });
     }
 
+    function replaySplatReveal() {
+        splatConfigurations.forEach((cfg) => {
+            const prev = splats[cfg.name];
+            if (!prev || !prev.visible) return;
+            const pos = prev.position.clone();
+            const rot = prev.rotation.clone();
+            const scl = prev.scale.clone();
+            scene.remove(prev);
+            if (typeof prev.dispose === 'function') { try { prev.dispose(); } catch (e) { /* best-effort */ } }
+            const newSplat = new LumaSplatsThree({
+                source: cfg.source,
+                particleRevealEnabled: true,
+                particleRevealDuration: cfg.particleRevealDuration
+            });
+            newSplat.material.depthTest = true;
+            newSplat.renderOrder = 999;
+            newSplat.position.copy(pos);
+            newSplat.rotation.copy(rot);
+            newSplat.scale.copy(scl);
+            newSplat.visible = true;
+            scene.add(newSplat);
+            splats[cfg.name] = newSplat;
+        });
+    }
+
     // ----------------------------------------------------------------------------
     //                    ZONE-BASED SPLAT TOGGLING LOGIC
     // ----------------------------------------------------------------------------
@@ -956,7 +981,8 @@
             sceneOrigin: parameters.scene.origin,
             startPosition: parameters.camera.startPosition,
             menuContainer: menuContainerEl,
-            propertyLabel: 'Six-S-Ranch'
+            propertyLabel: 'Six-S-Ranch',
+            onRecordStart: replaySplatReveal
         });
     }).catch(err => console.warn('Path animation failed to load', err));
 

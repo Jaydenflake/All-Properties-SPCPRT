@@ -310,16 +310,35 @@ if (isChrome()) {
             }
         });
 
-        let splat = new LumaSplatsThree({
+        const splatOptions = {
     source: 'https://lumalabs.ai/embed/ac10d788-558b-4bae-b288-ab8666a4ea0e?mode=sparkles&background=%23ffffff&color=%23000000&showTitle=true&loadBg=true&logoPosition=bottom-left&infoPosition=bottom-right&cinematicVideo=undefined&showMenu=false',
     particleRevealEnabled: true,
     particleRevealDuration: 3.33 // Speed up by 50%
-});
+};
 
+        let splat = new LumaSplatsThree(splatOptions);
 // Apply depth testing and lower render order for the splat
 splat.material.depthTest = true;
 splat.renderOrder = 999;  // Ensure the splat is rendered before the border
 scene.add(splat);
+
+        function replaySplatReveal() {
+            const prev = splat;
+            const pos = prev.position.clone();
+            const rot = prev.rotation.clone();
+            const scl = prev.scale.clone();
+            scene.remove(prev);
+            if (typeof prev.dispose === 'function') {
+                try { prev.dispose(); } catch (e) { /* best-effort */ }
+            }
+            splat = new LumaSplatsThree(splatOptions);
+            splat.material.depthTest = true;
+            splat.renderOrder = 999;
+            splat.position.copy(pos);
+            splat.rotation.copy(rot);
+            splat.scale.copy(scl);
+            scene.add(splat);
+        }
 
 
 
@@ -518,7 +537,8 @@ function createHotspot(hotspotConfig, index, totalHotspots) {
                 sceneOrigin: parameters.scene.origin,
                 startPosition: parameters.camera.startPosition,
                 menuContainer: menuContainerEl,
-                propertyLabel: 'Mt-Pleasant'
+                propertyLabel: 'Mt-Pleasant',
+                onRecordStart: replaySplatReveal
             });
         }).catch(err => console.warn('Path animation failed to load', err));
 

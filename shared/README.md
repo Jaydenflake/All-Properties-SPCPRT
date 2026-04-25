@@ -58,6 +58,7 @@ function animate() {
 | `menuContainer` | DOM element to append the record button to (e.g. `.menu-container`) |
 | `initialPath` | Optional `{ enabled, loop, speed, checkpoints[] }` to preload a path |
 | `propertyLabel` | String used in the recorded video filename (e.g. `'Hart-Bench-Ranch'`) |
+| `onRecordStart` | Optional `() => void` — called when recording starts (e.g. dispose/recreate Luma `LumaSplatsThree` to replay particle reveal in the capture) |
 
 ## Example
 
