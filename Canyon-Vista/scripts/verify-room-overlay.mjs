@@ -64,12 +64,57 @@ async function selectRoom(page, unit) {
   unit, { timeout: 30000 });
 }
 
+async function verifyFloorPanelCanvasPassThrough(page) {
+  await page.evaluate(() => {
+    window.__floorPlanCanvasPointerProbe = { count: 0, targets: [] };
+    const canvas = document.querySelector('canvas');
+    canvas?.addEventListener('pointerdown', (event) => {
+      window.__floorPlanCanvasPointerProbe.count += 1;
+      window.__floorPlanCanvasPointerProbe.targets.push({
+        x: event.clientX,
+        y: event.clientY,
+        target: event.target?.tagName || '',
+      });
+    }, { capture: true, once: true });
+  });
+
+  const point = await page.evaluate(() => {
+    const panel = document.getElementById('unitEditorPanel');
+    const rect = panel.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + 110;
+    const el = document.elementFromPoint(x, y);
+    return {
+      x,
+      y,
+      elementAtPoint: {
+        tag: el?.tagName || '',
+        id: el?.id || '',
+        className: String(el?.className || ''),
+      },
+    };
+  });
+
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.mouse.move(point.x + 180, point.y + 72, { steps: 8 });
+  await page.mouse.up();
+
+  const probe = await page.evaluate(() => window.__floorPlanCanvasPointerProbe);
+  assert(probe.count === 1, 'editor: floor-plan panel background should pass drag starts through to the 3D canvas', {
+    point,
+    probe,
+  });
+  return { point, probe };
+}
+
 async function verifyEditorControls(page) {
-  await page.click('#unitEditorToggle');
+  await page.locator('#unitEditorToggle').click({ force: true, timeout: 30000, noWaitAfter: true });
   await page.waitForFunction(() =>
     document.getElementById('unitEditorPanel').classList.contains('active') &&
     document.getElementById('roomKmlEditorPanel').closest('#unitEditorPanel'),
   null, { timeout: 30000 });
+  const panelCanvasPassThrough = await verifyFloorPanelCanvasPassThrough(page);
 
   const originalTransform = await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform());
   assert(originalTransform.rotationDeg === 0, 'editor: default plan rotation should be 0 for pancake-flipped overlay', originalTransform);
@@ -139,7 +184,7 @@ async function verifyEditorControls(page) {
     window.__roomKmlOverlay.setFloorTransform(transform);
   }, { transform: originalTransform, vertex: originalVertex });
   await page.locator('#roomKmlPlanTab').click({ force: true, timeout: 30000 });
-  await page.click('#unitEditorToggle');
+  await page.locator('#unitEditorToggle').click({ force: true, timeout: 30000, noWaitAfter: true });
 
   return {
     originalTransform,
@@ -150,6 +195,7 @@ async function verifyEditorControls(page) {
     editedHandle,
     draggedVertex,
     draggedHandle,
+    panelCanvasPassThrough,
     restoredTransform: await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform()),
     restoredVertex: await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0)),
   };

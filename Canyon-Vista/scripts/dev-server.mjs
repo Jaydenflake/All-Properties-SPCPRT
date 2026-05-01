@@ -1,7 +1,13 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { createServer } from 'node:http';
-const root = resolve(process.cwd());
+function parseRootArg(argv) {
+  const idx = argv.indexOf('--root');
+  if (idx === -1) return null;
+  return argv[idx + 1] || null;
+}
+
+const root = resolve(parseRootArg(process.argv) || process.cwd());
 const host = process.env.SERVER_HOST || '127.0.0.1';
 const initialPort = Number.parseInt(process.env.SERVER_PORT || '4173', 10);
 const maxPort = Number.parseInt(process.env.SERVER_PORT_MAX || String(initialPort + 20), 10);
