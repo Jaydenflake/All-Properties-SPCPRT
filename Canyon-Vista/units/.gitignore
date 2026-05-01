@@ -1,0 +1,19 @@
+# SAM2 / PyTorch checkpoints (large; never commit)
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+env/
+
+# Outputs from local runs (optional — remove lines if you want clicks in repo)
+# clicks.json
+# units_raw.json
+# registration_report.txt

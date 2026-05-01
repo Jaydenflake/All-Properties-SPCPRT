@@ -100,6 +100,8 @@
   <script>
     const properties = [
       { file: 'index(46th-Street-06-24-24).html', name: '46th Street' },
+      { path: 'apartments/index.html', name: 'Canyon Vista — Apartments', meta: 'Browse units in 3D & apply' },
+      { path: 'Canyon-Vista/index.html', name: 'Canyon Vista' },
       { file: 'index(Columbia-Eden-05-21-24).html', name: 'Columbia Eden' },
       { file: 'index(Copper-Rock-02-15-26).html', name: 'Copper Rock' },
       { file: 'index(Cromwell-Island-08-31-25).html', name: 'Cromwell Island' },
@@ -126,8 +128,8 @@
     properties.forEach((p) => {
       const a = document.createElement('a');
       a.className = 'prop-btn';
-      a.href = base + p.file;
-      a.innerHTML = `<span class="name">${p.name}</span><span class="meta">View 3D tour</span>`;
+      a.href = p.path ?? base + p.file;
+      a.innerHTML = `<span class="name">${p.name}</span><span class="meta">${p.meta ?? 'View 3D tour'}</span>`;
       grid.appendChild(a);
     });
   </script>

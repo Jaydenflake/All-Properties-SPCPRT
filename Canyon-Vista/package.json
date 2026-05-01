@@ -1,0 +1,8 @@
+{
+  "name": "canyon-vista",
+  "private": true,
+  "scripts": {
+    "start": "./scripts/run-local.sh",
+    "dev": "./scripts/run-local.sh"
+  }
+}

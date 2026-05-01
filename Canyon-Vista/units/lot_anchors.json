@@ -1,0 +1,26 @@
+{
+  "_comment": "Snapshot of borderDotPositionsByHole[0] from Canyon-Vista/index.html. Re-export if lot vertices change.",
+  "vertices": [
+    { "name": "Lot_V1", "position": { "x": 0.619899, "y": -0.07236, "z": 0.910146 } },
+    { "name": "Lot_V4", "position": { "x": 0.613988, "y": -0.12955, "z": -0.646242 } },
+    { "name": "Lot_V5", "position": { "x": 0.432838, "y": -0.1341, "z": -0.769965 } },
+    { "name": "Lot_V6", "position": { "x": 0.356929, "y": -0.13712, "z": -0.852191 } },
+    { "name": "Lot_V7", "position": { "x": 0.134329, "y": -0.139, "z": -0.90331 } },
+    { "name": "Lot_V8", "position": { "x": 0.047765, "y": -0.14156, "z": -0.972969 } },
+    { "name": "Lot_V9", "position": { "x": -0.858899, "y": -0.15415, "z": -1.315852 } },
+    { "name": "Lot_V10", "position": { "x": -0.903571, "y": -0.15539, "z": -1.3497 } },
+    { "name": "Lot_V11", "position": { "x": -1.743049, "y": -0.152, "z": -1.527306 } },
+    { "name": "Lot_V12", "position": { "x": -1.877436, "y": -0.105, "z": -0.181094 } },
+    { "name": "Lot_V13", "position": { "x": -1.830478, "y": -0.06, "z": 0.921714 } },
+    { "name": "Lot_V15", "position": { "x": -0.851375, "y": -0.12134, "z": -0.344962 } },
+    { "name": "Lot_V16", "position": { "x": -0.860571, "y": -0.07236, "z": 0.910337 } },
+    { "name": "Lot_V18", "position": { "x": 0.608931, "y": -0.09746, "z": 0.230155 } },
+    { "name": "Lot_V19", "position": { "x": -0.907887, "y": -0.15727, "z": -1.432879 } },
+    { "name": "Lot_V20", "position": { "x": -0.970607, "y": -0.1613, "z": -1.52137 } },
+    { "name": "Lot_V21", "position": { "x": 0.480793, "y": -0.09984, "z": 0.164791 } },
+    { "name": "Lot_V22", "position": { "x": -0.208798, "y": -0.14321, "z": -1.079954 } },
+    { "name": "Lot_V23", "position": { "x": -0.68705, "y": -0.15194, "z": -1.24425 } },
+    { "name": "Lot_V24", "position": { "x": -0.520112, "y": -0.14624, "z": -1.139954 } },
+    { "name": "Lot_V25", "position": { "x": -0.140558, "y": -0.14154, "z": -1.024829 } }
+  ]
+}

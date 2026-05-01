@@ -1,0 +1,10 @@
+{
+  "_instructions": "For each entry, pick the same corner on canyon_vista_sitemap.png as the named lot vertex (from lot_anchors.json), in IMAGE pixel coordinates (x right, y down). Copy to correspondences.json and fill in accurate click_px after measuring in an image editor or from the click tool.",
+  "correspondences": [
+    { "lot_vertex_name": "Lot_V1", "click_px": [0, 0] },
+    { "lot_vertex_name": "Lot_V11", "click_px": [0, 0] },
+    { "lot_vertex_name": "Lot_V12", "click_px": [0, 0] },
+    { "lot_vertex_name": "Lot_V13", "click_px": [0, 0] },
+    { "lot_vertex_name": "Lot_V4", "click_px": [0, 0] }
+  ]
+}
