@@ -241,6 +241,7 @@ export function initRoomKmlOverlay({
   kmlUrl = DEFAULT_KML_URL,
   borderDotPositions = [],
   sceneY = DEFAULT_SCENE_Y,
+  pauseCameraAutomation = null,
   elements = {},
 } = {}) {
   const state = {
@@ -268,9 +269,9 @@ export function initRoomKmlOverlay({
     const focusDistance = Math.min(1.35, Math.max(0.72, roomFootprintSize(room) * 4.8));
     controls.target.set(room.center.x, sceneY, room.center.z);
     camera.position.set(
-      room.center.x + focusDistance * 0.35,
-      sceneY + focusDistance * 0.9,
-      room.center.z + focusDistance * 0.85
+      room.center.x + focusDistance * 0.22,
+      sceneY + focusDistance * 1.16,
+      room.center.z + focusDistance * 0.38
     );
     controls.update();
   }
@@ -280,6 +281,7 @@ export function initRoomKmlOverlay({
     state.selectedRoom = room || null;
     if (state.selectedRoom) {
       applyRoomVisual(state.selectedRoom, true);
+      if (typeof pauseCameraAutomation === 'function') pauseCameraAutomation();
       if (syncInput && input) input.value = String(state.selectedRoom.unit);
       setStatus(`Room ${state.selectedRoom.unit}`);
       document.documentElement.dataset.selectedRoom = String(state.selectedRoom.unit);

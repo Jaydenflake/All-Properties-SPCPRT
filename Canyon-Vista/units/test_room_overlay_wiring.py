@@ -20,6 +20,7 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn('id="roomLookupStatus"', html)
         self.assertIn("../shared/unit-kml-overlay.mjs", html)
         self.assertIn("exports/canyon-vista-units.kml", html)
+        self.assertIn("pauseCameraAutomation: pauseCameraAutomationFromInteraction", html)
 
     def test_overlay_module_exposes_runtime_api(self) -> None:
         source = MODULE_PATH.read_text(encoding="utf-8")
