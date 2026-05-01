@@ -28,6 +28,7 @@ const NORMAL_LINE_COLOR = 0xf2f2f2;
 const SELECTED_LINE_COLOR = 0xffd047;
 const NORMAL_FILL_COLOR = 0xff6b35;
 const SELECTED_FILL_COLOR = 0xffd047;
+const DEFAULT_FLOOR_ROTATION_DEG = 180;
 
 function round6(n) {
   return Math.round(n * 1e6) / 1e6;
@@ -277,7 +278,7 @@ export function initRoomKmlOverlay({
     editorOpen: false,
     editorMode: 'plan',
     floorBaseCenter: { x: 0, z: 0 },
-    floorTransform: { centerX: 0, centerZ: 0, rotationDeg: 0, scale: 1 },
+    floorTransform: { centerX: 0, centerZ: 0, rotationDeg: DEFAULT_FLOOR_ROTATION_DEG, scale: 1 },
     group: new Group(),
     raycaster: new Raycaster(),
     ndc: new Vector2(),
@@ -365,7 +366,7 @@ export function initRoomKmlOverlay({
     state.floorTransform = {
       centerX: state.floorBaseCenter.x,
       centerZ: state.floorBaseCenter.z,
-      rotationDeg: 0,
+      rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
       scale: 1,
     };
     applyFloorTransform();
@@ -659,7 +660,7 @@ export function initRoomKmlOverlay({
     state.floorTransform = {
       centerX: state.floorBaseCenter.x,
       centerZ: state.floorBaseCenter.z,
-      rotationDeg: 0,
+      rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
       scale: 1,
     };
     applyFloorTransform();

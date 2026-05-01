@@ -72,7 +72,7 @@ async function verifyEditorControls(page) {
   const targetTransform = {
     centerX: Number((originalTransform.centerX + 0.025).toFixed(6)),
     centerZ: Number((originalTransform.centerZ - 0.018).toFixed(6)),
-    rotationDeg: 3.5,
+    rotationDeg: Number((originalTransform.rotationDeg + 3.5).toFixed(6)),
     scale: 1.04,
   };
   await page.fill('#roomKmlCenterX', String(targetTransform.centerX));

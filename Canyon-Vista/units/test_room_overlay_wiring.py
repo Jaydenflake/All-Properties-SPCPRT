@@ -37,6 +37,7 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn("getRoomScreenState", source)
         self.assertIn("getRoomVisualState", source)
         self.assertIn("orbitSelectedRoomForVerification", source)
+        self.assertIn("DEFAULT_FLOOR_ROTATION_DEG = 180", source)
         self.assertIn("setFloorTransform", source)
         self.assertIn("getFloorTransform", source)
         self.assertIn("updateRoomVertex", source)
