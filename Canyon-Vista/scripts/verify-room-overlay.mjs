@@ -98,6 +98,8 @@ async function verifyEditorControls(page) {
   await page.locator('#roomKmlVertexTab').click({ force: true, timeout: 10000 });
   await page.waitForFunction(() => document.getElementById('roomKmlVertexPane').classList.contains('active'), null, { timeout: 10000 });
   const originalVertex = await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0));
+  const originalHandle = await page.evaluate(() => window.__roomKmlOverlay.getVertexHandleScreenState(23, 0));
+  assert(originalHandle?.visible, 'editor: vertex handle should be visible for the selected room', originalHandle);
   const targetVertex = [Number((originalVertex[0] + 0.012).toFixed(6)), Number((originalVertex[1] - 0.01).toFixed(6))];
   await page.selectOption('#roomKmlVertexSelect', '0');
   await page.fill('#roomKmlVertexX', String(targetVertex[0]));
@@ -106,6 +108,28 @@ async function verifyEditorControls(page) {
     const current = window.__roomKmlOverlay.getRoomVertex(23, 0);
     return Math.abs(current[0] - expected[0]) < 0.00001 && Math.abs(current[1] - expected[1]) < 0.00001;
   }, targetVertex, { timeout: 10000 });
+  const editedHandle = await page.evaluate(() => window.__roomKmlOverlay.getVertexHandleScreenState(23, 0));
+  assert(editedHandle?.visible, 'editor: vertex handle should stay visible after numeric edit', editedHandle);
+
+  await page.mouse.move(editedHandle.viewport.x, editedHandle.viewport.y);
+  await page.mouse.down();
+  await page.mouse.move(editedHandle.viewport.x + 54, editedHandle.viewport.y - 36, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForFunction((previous) => {
+    const current = window.__roomKmlOverlay.getRoomVertex(23, 0);
+    return Math.abs(current[0] - previous[0]) > 0.0001 || Math.abs(current[1] - previous[1]) > 0.0001;
+  }, targetVertex, { timeout: 10000 });
+  const draggedVertex = await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0));
+  const draggedHandle = await page.evaluate(() => window.__roomKmlOverlay.getVertexHandleScreenState(23, 0));
+  const dragFields = await page.evaluate(() => ({
+    selectedVertex: document.getElementById('roomKmlVertexSelect').value,
+    x: Number.parseFloat(document.getElementById('roomKmlVertexX').value),
+    z: Number.parseFloat(document.getElementById('roomKmlVertexZ').value),
+  }));
+  assert(draggedHandle?.visible, 'editor: vertex handle should remain visible after drag', draggedHandle);
+  assert(dragFields.selectedVertex === '0', 'editor: dragged vertex should remain selected', dragFields);
+  assert(Math.abs(dragFields.x - draggedVertex[0]) < 0.00001 && Math.abs(dragFields.z - draggedVertex[1]) < 0.00001,
+    'editor: drag should update numeric X/Z fields', { dragFields, draggedVertex });
 
   await page.evaluate(({ transform, vertex }) => {
     window.__roomKmlOverlay.updateRoomVertex(23, 0, { x: vertex[0], z: vertex[1] });
@@ -119,6 +143,10 @@ async function verifyEditorControls(page) {
     targetTransform,
     originalVertex,
     targetVertex,
+    originalHandle,
+    editedHandle,
+    draggedVertex,
+    draggedHandle,
     restoredTransform: await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform()),
     restoredVertex: await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0)),
   };

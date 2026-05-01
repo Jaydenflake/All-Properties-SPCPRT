@@ -37,6 +37,10 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn("getSelectedRoom", source)
         self.assertIn("getRoomScreenState", source)
         self.assertIn("getRoomVisualState", source)
+        self.assertIn("getVertexHandleScreenState", source)
+        self.assertIn("beginVertexDragForVerification", source)
+        self.assertIn("moveVertexDragForVerification", source)
+        self.assertIn("focusRoomTopDown", source)
         self.assertIn("orbitSelectedRoomForVerification", source)
         self.assertIn("DEFAULT_FLOOR_ROTATION_DEG = 0", source)
         self.assertIn("DEFAULT_FLOOR_FLIP_X = true", source)
@@ -44,6 +48,7 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn("getFloorTransform", source)
         self.assertIn("updateRoomVertex", source)
         self.assertIn("getRoomVertex", source)
+        self.assertIn("setPointerCapture", source)
         self.assertIn("depthTest: false", source)
         self.assertIn("window.__roomKmlOverlay", source)
 

@@ -12,9 +12,11 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  Plane,
   Raycaster,
   Shape,
   ShapeGeometry,
+  SphereGeometry,
   Vector2,
   Vector3,
 } from 'three';
@@ -30,6 +32,9 @@ const NORMAL_FILL_COLOR = 0xff6b35;
 const SELECTED_FILL_COLOR = 0xffd047;
 const DEFAULT_FLOOR_ROTATION_DEG = 0;
 const DEFAULT_FLOOR_FLIP_X = true;
+const VERTEX_HANDLE_COLOR = 0x36d6ff;
+const SELECTED_VERTEX_HANDLE_COLOR = 0xffd047;
+const VERTEX_HANDLE_RADIUS = 0.026;
 
 function round6(n) {
   return Math.round(n * 1e6) / 1e6;
@@ -255,6 +260,25 @@ function groupRenderData(mesh, unit) {
   mesh.userData.roomUnit = unit;
 }
 
+function makeVertexHandleMesh(unit, vertexIndex, point, sceneY, selected) {
+  const geometry = new SphereGeometry(VERTEX_HANDLE_RADIUS, 18, 10);
+  const material = new MeshBasicMaterial({
+    color: selected ? SELECTED_VERTEX_HANDLE_COLOR : VERTEX_HANDLE_COLOR,
+    transparent: true,
+    opacity: 0.96,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const mesh = new Mesh(geometry, material);
+  mesh.position.set(point[0], sceneY + 0.038, point[1]);
+  mesh.scale.setScalar(selected ? 1.45 : 1.08);
+  mesh.renderOrder = 1012;
+  mesh.userData.isVertexHandle = true;
+  mesh.userData.roomUnit = unit;
+  mesh.userData.vertexIndex = vertexIndex;
+  return mesh;
+}
+
 function roomFootprintSize(room) {
   const xs = room.cornersXz.map((point) => point[0]);
   const zs = room.cornersXz.map((point) => point[1]);
@@ -287,12 +311,20 @@ export function initRoomKmlOverlay({
       flipX: DEFAULT_FLOOR_FLIP_X,
     },
     group: new Group(),
+    vertexHandleGroup: new Group(),
+    vertexHandles: [],
+    drag: null,
+    floorDragPlane: new Plane(new Vector3(0, 1, 0), -sceneY),
+    floorDragPoint: new Vector3(),
+    groupInverseMatrix: new Matrix4(),
     raycaster: new Raycaster(),
     ndc: new Vector2(),
     ready: null,
   };
   state.group.name = 'room-kml-overlay';
+  state.vertexHandleGroup.name = 'room-kml-vertex-handles';
   state.group.matrixAutoUpdate = false;
+  state.group.add(state.vertexHandleGroup);
   scene.add(state.group);
 
   const input = elements.input || null;
@@ -334,6 +366,28 @@ export function initRoomKmlOverlay({
     return displayedPoint([room.center.x, room.center.z], room.center.y);
   }
 
+  function setPointerNdc(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    state.ndc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    state.ndc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function capturePointer(pointerId) {
+    try {
+      renderer.domElement.setPointerCapture?.(pointerId);
+    } catch {
+      // Verification can use synthetic pointer ids that are not active browser pointers.
+    }
+  }
+
+  function releasePointer(pointerId) {
+    try {
+      renderer.domElement.releasePointerCapture?.(pointerId);
+    } catch {
+      // Matching capture can fail for synthetic verification pointers.
+    }
+  }
+
   function applyFloorTransform() {
     const { centerX, centerZ, rotationDeg, scale, flipX } = state.floorTransform;
     const moveToOrigin = new Matrix4().makeTranslation(-state.floorBaseCenter.x, 0, -state.floorBaseCenter.z);
@@ -343,6 +397,26 @@ export function initRoomKmlOverlay({
     state.group.matrix.identity();
     state.group.matrix.multiply(moveToCenter).multiply(rotationMatrix).multiply(scaleMatrix).multiply(moveToOrigin);
     state.group.updateMatrixWorld(true);
+  }
+
+  function clearVertexHandles() {
+    state.vertexHandles.forEach((handle) => {
+      handle.geometry?.dispose?.();
+      handle.material?.dispose?.();
+    });
+    state.vertexHandleGroup.clear();
+    state.vertexHandles = [];
+  }
+
+  function syncVertexHandles() {
+    clearVertexHandles();
+    const room = state.selectedRoom;
+    if (state.editorMode !== 'vertex' || !room) return;
+    room.cornersXz.forEach((point, idx) => {
+      const handle = makeVertexHandleMesh(room.unit, idx, point, sceneY, idx === state.selectedVertexIndex);
+      state.vertexHandles.push(handle);
+      state.vertexHandleGroup.add(handle);
+    });
   }
 
   function syncPlanInputs() {
@@ -404,6 +478,8 @@ export function initRoomKmlOverlay({
     if (vertexTab) vertexTab.classList.toggle('active', state.editorMode === 'vertex');
     if (planPane) planPane.classList.toggle('active', state.editorMode === 'plan');
     if (vertexPane) vertexPane.classList.toggle('active', state.editorMode === 'vertex');
+    syncVertexHandles();
+    if (state.editorMode === 'vertex' && state.selectedRoom) focusRoomTopDown(state.selectedRoom);
   }
 
   function syncVertexInputs() {
@@ -425,6 +501,7 @@ export function initRoomKmlOverlay({
     const vertex = room ? room.cornersXz[state.selectedVertexIndex] : null;
     if (vertexXInput) vertexXInput.value = vertex ? formatNumber(vertex[0]) : '';
     if (vertexZInput) vertexZInput.value = vertex ? formatNumber(vertex[1]) : '';
+    syncVertexHandles();
   }
 
   function getRoomVertex(unit, vertexIndex = 0) {
@@ -460,6 +537,26 @@ export function initRoomKmlOverlay({
     controls.update();
   }
 
+  function focusRoomTopDown(room) {
+    if (!room || !controls || !camera) return;
+    const center = displayedCenter(room);
+    const focusDistance = Math.min(2.2, Math.max(1.05, roomFootprintSize(room) * state.floorTransform.scale * 7.2));
+    controls.target.set(center.x, center.y, center.z);
+    camera.position.set(center.x + 0.002, sceneY + focusDistance, center.z + 0.002);
+    controls.update();
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const desiredX = rect.width < 720 ? 0.82 : 0.58;
+    const desiredNdc = new Vector2(desiredX * 2 - 1, -(0.55 * 2 - 1));
+    state.raycaster.setFromCamera(desiredNdc, camera);
+    if (state.raycaster.ray.intersectPlane(state.floorDragPlane, state.floorDragPoint)) {
+      const offset = new Vector3().subVectors(center, state.floorDragPoint);
+      controls.target.add(offset);
+      camera.position.add(offset);
+      controls.update();
+    }
+  }
+
   function setSelectedRoom(room, { syncInput = true, focus = true } = {}) {
     if (state.selectedRoom) applyRoomVisual(state.selectedRoom, false);
     state.selectedRoom = room || null;
@@ -471,7 +568,8 @@ export function initRoomKmlOverlay({
       document.documentElement.dataset.selectedRoom = String(state.selectedRoom.unit);
       syncVertexInputs();
       if (focus && controls) {
-        focusRoom(state.selectedRoom);
+        if (state.editorMode === 'vertex') focusRoomTopDown(state.selectedRoom);
+        else focusRoom(state.selectedRoom);
       }
     } else {
       if (syncInput && input) input.value = '';
@@ -509,16 +607,135 @@ export function initRoomKmlOverlay({
     return objects;
   }
 
+  function pickVertexHandle(event) {
+    if (state.editorMode !== 'vertex' || !state.selectedRoom || !state.vertexHandles.length) return null;
+    setPointerNdc(event);
+    state.raycaster.setFromCamera(state.ndc, camera);
+    const hits = state.raycaster.intersectObjects(state.vertexHandles, false);
+    return hits[0]?.object || null;
+  }
+
+  function beginVertexDrag(event) {
+    const handle = pickVertexHandle(event);
+    if (!handle) return false;
+    const room = state.rooms.get(handle.userData.roomUnit);
+    const vertexIndex = handle.userData.vertexIndex;
+    if (!room || !Number.isFinite(vertexIndex)) return false;
+    if (typeof pauseCameraAutomation === 'function') pauseCameraAutomation();
+    state.selectedVertexIndex = vertexIndex;
+    syncVertexInputs();
+    state.drag = {
+      room,
+      vertexIndex,
+      pointerId: event.pointerId,
+      previousControlsEnabled: controls ? controls.enabled : undefined,
+    };
+    if (controls) controls.enabled = false;
+    capturePointer(event.pointerId);
+    renderer.domElement.style.cursor = 'grabbing';
+    setStatus(`Dragging vertex ${vertexIndex + 1}`);
+    return true;
+  }
+
+  function moveVertexDrag(event) {
+    if (!state.drag) return false;
+    setPointerNdc(event);
+    state.raycaster.setFromCamera(state.ndc, camera);
+    if (!state.raycaster.ray.intersectPlane(state.floorDragPlane, state.floorDragPoint)) return false;
+    state.group.updateMatrixWorld(true);
+    state.groupInverseMatrix.copy(state.group.matrixWorld).invert();
+    const localPoint = state.floorDragPoint.clone().applyMatrix4(state.groupInverseMatrix);
+    const updated = updateRoomVertex(state.drag.room.unit, state.drag.vertexIndex, {
+      x: localPoint.x,
+      z: localPoint.z,
+    });
+    return !!updated;
+  }
+
+  function endVertexDrag(event = {}) {
+    if (!state.drag) return false;
+    if (controls && typeof state.drag.previousControlsEnabled === 'boolean') {
+      controls.enabled = state.drag.previousControlsEnabled;
+    }
+    if (Number.isFinite(event.pointerId)) releasePointer(event.pointerId);
+    state.drag = null;
+    renderer.domElement.style.cursor = '';
+    if (state.selectedRoom) setStatus(`Room ${state.selectedRoom.unit}`);
+    return true;
+  }
+
+  function pointerEventForScreenPoint(point) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    return {
+      clientX: rect.left + point.x,
+      clientY: rect.top + point.y,
+      pointerId: 1,
+    };
+  }
+
+  function beginVertexDragForVerification(unit, vertexIndex = 0) {
+    if (!selectRoom(unit, { syncInput: true, focus: true })) return false;
+    setEditorOpen(true);
+    setEditorMode('vertex');
+    state.selectedVertexIndex = Number.parseInt(String(vertexIndex), 10) || 0;
+    syncVertexInputs();
+    const handle = getVertexHandleScreenState(unit, state.selectedVertexIndex);
+    if (!handle?.visible) return false;
+    return beginVertexDrag(pointerEventForScreenPoint(handle.screen));
+  }
+
+  function moveVertexDragForVerification(deltaX = 0, deltaY = 0) {
+    if (!state.drag) return null;
+    const handle = getVertexHandleScreenState(state.drag.room.unit, state.drag.vertexIndex);
+    if (!handle?.visible) return null;
+    const moved = moveVertexDrag(pointerEventForScreenPoint({
+      x: handle.screen.x + deltaX,
+      y: handle.screen.y + deltaY,
+    }));
+    if (!moved) return null;
+    return getRoomVertex(state.drag.room.unit, state.drag.vertexIndex);
+  }
+
+  function endVertexDragForVerification() {
+    return endVertexDrag({ pointerId: state.drag?.pointerId });
+  }
+
   function selectFromPointer(event) {
     if (!state.rooms.size) return false;
-    const rect = renderer.domElement.getBoundingClientRect();
-    state.ndc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    state.ndc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    setPointerNdc(event);
     state.raycaster.setFromCamera(state.ndc, camera);
     const hits = state.raycaster.intersectObjects(getRoomObjects(), false);
     if (!hits.length) return false;
     const unit = hits[0].object.userData.roomUnit;
     return selectRoom(unit, { syncInput: true, focus: false });
+  }
+
+  function getVertexHandleScreenState(unit, vertexIndex = 0) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    const idx = Number.parseInt(String(vertexIndex), 10);
+    if (!room || !room.cornersXz[idx] || !camera || !renderer?.domElement) return null;
+    camera.updateProjectionMatrix?.();
+    camera.updateMatrixWorld?.(true);
+    state.group.updateMatrixWorld(true);
+    const rect = renderer.domElement.getBoundingClientRect();
+    const world = displayedPoint(room.cornersXz[idx], sceneY + 0.038);
+    const projected = world.clone().project(camera);
+    const screen = {
+      x: round6((projected.x + 1) * 0.5 * rect.width),
+      y: round6((1 - projected.y) * 0.5 * rect.height),
+      z: round6(projected.z),
+    };
+    return {
+      unit: room.unit,
+      vertexIndex: idx,
+      visible: projected.z > -1 && projected.z < 1 && screen.x >= 0 && screen.x <= rect.width && screen.y >= 0 && screen.y <= rect.height,
+      screen,
+      viewport: {
+        x: round6(rect.left + screen.x),
+        y: round6(rect.top + screen.y),
+      },
+      vertex: clonePoint(room.cornersXz[idx]),
+    };
   }
 
   function getRoomScreenState(unit) {
@@ -579,10 +796,22 @@ export function initRoomKmlOverlay({
   }
 
   function handlePointerDown(event) {
-    if (selectFromPointer(event)) {
+    if (beginVertexDrag(event) || selectFromPointer(event)) {
       event.preventDefault();
       event.stopPropagation();
     }
+  }
+
+  function handlePointerMove(event) {
+    if (!moveVertexDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handlePointerUp(event) {
+    if (!endVertexDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   if (panel) {
@@ -660,6 +889,9 @@ export function initRoomKmlOverlay({
     clearButton.addEventListener('click', () => setSelectedRoom(null, { syncInput: true, focus: false }));
   }
   renderer.domElement.addEventListener('pointerdown', handlePointerDown, { passive: false, capture: true });
+  renderer.domElement.addEventListener('pointermove', handlePointerMove, { passive: false, capture: true });
+  renderer.domElement.addEventListener('pointerup', handlePointerUp, { passive: false, capture: true });
+  renderer.domElement.addEventListener('pointercancel', handlePointerUp, { passive: false, capture: true });
 
   async function load() {
     setStatus('Loading rooms');
@@ -719,6 +951,10 @@ export function initRoomKmlOverlay({
     },
     getRoomVertex,
     updateRoomVertex,
+    getVertexHandleScreenState,
+    beginVertexDragForVerification,
+    moveVertexDragForVerification,
+    endVertexDragForVerification,
     getFloorTransform,
     setFloorTransform,
     resetFloorTransform,
@@ -741,6 +977,10 @@ export function initRoomKmlOverlay({
     orbitSelectedRoomForVerification,
     dispose() {
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove, { capture: true });
+      renderer.domElement.removeEventListener('pointerup', handlePointerUp, { capture: true });
+      renderer.domElement.removeEventListener('pointercancel', handlePointerUp, { capture: true });
+      endVertexDrag();
       scene.remove(state.group);
       state.group.traverse((child) => {
         child.geometry?.dispose?.();
