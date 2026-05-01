@@ -135,6 +135,10 @@ function polygonCenter(points) {
   );
 }
 
+function clonePoint(point) {
+  return [round6(point[0]), round6(point[1])];
+}
+
 function makeFillMesh(points, y, material) {
   const shape = new Shape();
   shape.moveTo(points[0][0], -points[0][1]);
@@ -227,6 +231,28 @@ function buildRoom(unitData, transform, sceneY) {
   };
 }
 
+function rebuildRoomGeometry(room, sceneY) {
+  room.group.children.forEach((child) => child.geometry?.dispose?.());
+  room.group.clear();
+  const [cx, cz] = polygonCenter(room.cornersXz);
+  room.center.set(cx, sceneY, cz);
+  const fillMesh = makeFillMesh(room.cornersXz, sceneY, room.fillMaterial);
+  fillMesh.userData.roomUnit = room.unit;
+  groupRenderData(fillMesh, room.unit);
+  room.group.add(fillMesh);
+  room.cornersXz.forEach((point, idx) => {
+    const next = room.cornersXz[(idx + 1) % room.cornersXz.length];
+    const edge = makeEdgeMesh(point, next, sceneY + 0.004, room.lineMaterial);
+    edge.userData.roomUnit = room.unit;
+    groupRenderData(edge, room.unit);
+    room.group.add(edge);
+  });
+}
+
+function groupRenderData(mesh, unit) {
+  mesh.userData.roomUnit = unit;
+}
+
 function roomFootprintSize(room) {
   const xs = room.cornersXz.map((point) => point[0]);
   const zs = room.cornersXz.map((point) => point[1]);
@@ -247,31 +273,173 @@ export function initRoomKmlOverlay({
   const state = {
     rooms: new Map(),
     selectedRoom: null,
+    selectedVertexIndex: 0,
+    editorOpen: false,
+    editorMode: 'plan',
+    floorBaseCenter: { x: 0, z: 0 },
+    floorTransform: { centerX: 0, centerZ: 0, rotationDeg: 0, scale: 1 },
     group: new Group(),
     raycaster: new Raycaster(),
     ndc: new Vector2(),
     ready: null,
   };
   state.group.name = 'room-kml-overlay';
+  state.group.matrixAutoUpdate = false;
   scene.add(state.group);
 
   const input = elements.input || null;
   const statusEl = elements.statusEl || null;
   const clearButton = elements.clearButton || null;
   const panel = elements.panel || null;
+  const editorToggle = elements.editorToggle || null;
+  const editorPanel = elements.editorPanel || null;
+  const planTab = elements.planTab || null;
+  const vertexTab = elements.vertexTab || null;
+  const planPane = elements.planPane || null;
+  const vertexPane = elements.vertexPane || null;
+  const centerXInput = elements.centerX || null;
+  const centerZInput = elements.centerZ || null;
+  const rotationInput = elements.rotation || null;
+  const scaleInput = elements.scale || null;
+  const resetTransformButton = elements.resetTransformButton || null;
+  const editorSelectedEl = elements.editorSelectedEl || null;
+  const vertexSelect = elements.vertexSelect || null;
+  const vertexXInput = elements.vertexX || null;
+  const vertexZInput = elements.vertexZ || null;
+  const applyVertexButton = elements.applyVertexButton || null;
 
   function setStatus(text) {
     if (statusEl) statusEl.textContent = text;
   }
 
+  function formatNumber(value) {
+    return Number.isFinite(value) ? String(round6(value)) : '';
+  }
+
+  function displayedPoint([x, z], y = sceneY) {
+    state.group.updateMatrixWorld(true);
+    return new Vector3(x, y, z).applyMatrix4(state.group.matrixWorld);
+  }
+
+  function displayedCenter(room) {
+    return displayedPoint([room.center.x, room.center.z], room.center.y);
+  }
+
+  function applyFloorTransform() {
+    const { centerX, centerZ, rotationDeg, scale } = state.floorTransform;
+    const moveToOrigin = new Matrix4().makeTranslation(-state.floorBaseCenter.x, 0, -state.floorBaseCenter.z);
+    const scaleMatrix = new Matrix4().makeScale(scale, 1, scale);
+    const rotationMatrix = new Matrix4().makeRotationY((rotationDeg * Math.PI) / 180);
+    const moveToCenter = new Matrix4().makeTranslation(centerX, 0, centerZ);
+    state.group.matrix.identity();
+    state.group.matrix.multiply(moveToCenter).multiply(rotationMatrix).multiply(scaleMatrix).multiply(moveToOrigin);
+    state.group.updateMatrixWorld(true);
+  }
+
+  function syncPlanInputs() {
+    if (centerXInput) centerXInput.value = formatNumber(state.floorTransform.centerX);
+    if (centerZInput) centerZInput.value = formatNumber(state.floorTransform.centerZ);
+    if (rotationInput) rotationInput.value = formatNumber(state.floorTransform.rotationDeg);
+    if (scaleInput) scaleInput.value = formatNumber(state.floorTransform.scale);
+  }
+
+  function setFloorTransform(next = {}) {
+    const centerX = Number.parseFloat(next.centerX);
+    const centerZ = Number.parseFloat(next.centerZ);
+    const rotationDeg = Number.parseFloat(next.rotationDeg);
+    const scale = Number.parseFloat(next.scale);
+    if (Number.isFinite(centerX)) state.floorTransform.centerX = round6(centerX);
+    if (Number.isFinite(centerZ)) state.floorTransform.centerZ = round6(centerZ);
+    if (Number.isFinite(rotationDeg)) state.floorTransform.rotationDeg = round6(rotationDeg);
+    if (Number.isFinite(scale)) state.floorTransform.scale = round6(Math.max(0.05, Math.min(20, scale)));
+    applyFloorTransform();
+    syncPlanInputs();
+    return getFloorTransform();
+  }
+
+  function getFloorTransform() {
+    return { ...state.floorTransform };
+  }
+
+  function resetFloorTransform() {
+    state.floorTransform = {
+      centerX: state.floorBaseCenter.x,
+      centerZ: state.floorBaseCenter.z,
+      rotationDeg: 0,
+      scale: 1,
+    };
+    applyFloorTransform();
+    syncPlanInputs();
+    return getFloorTransform();
+  }
+
+  function setEditorOpen(open) {
+    state.editorOpen = !!open;
+    if (editorPanel) editorPanel.classList.toggle('active', state.editorOpen);
+    if (editorToggle) {
+      editorToggle.classList.toggle('active', state.editorOpen);
+      editorToggle.setAttribute('aria-pressed', state.editorOpen ? 'true' : 'false');
+    }
+  }
+
+  function setEditorMode(mode) {
+    state.editorMode = mode === 'vertex' ? 'vertex' : 'plan';
+    if (planTab) planTab.classList.toggle('active', state.editorMode === 'plan');
+    if (vertexTab) vertexTab.classList.toggle('active', state.editorMode === 'vertex');
+    if (planPane) planPane.classList.toggle('active', state.editorMode === 'plan');
+    if (vertexPane) vertexPane.classList.toggle('active', state.editorMode === 'vertex');
+  }
+
+  function syncVertexInputs() {
+    const room = state.selectedRoom;
+    if (editorSelectedEl) editorSelectedEl.textContent = room ? `Unit ${room.unit}` : 'Select a room';
+    if (vertexSelect) {
+      vertexSelect.innerHTML = '';
+      if (room) {
+        room.cornersXz.forEach((_, idx) => {
+          const option = document.createElement('option');
+          option.value = String(idx);
+          option.textContent = `Vertex ${idx + 1}`;
+          vertexSelect.appendChild(option);
+        });
+        state.selectedVertexIndex = Math.min(state.selectedVertexIndex, room.cornersXz.length - 1);
+        vertexSelect.value = String(state.selectedVertexIndex);
+      }
+    }
+    const vertex = room ? room.cornersXz[state.selectedVertexIndex] : null;
+    if (vertexXInput) vertexXInput.value = vertex ? formatNumber(vertex[0]) : '';
+    if (vertexZInput) vertexZInput.value = vertex ? formatNumber(vertex[1]) : '';
+  }
+
+  function getRoomVertex(unit, vertexIndex = 0) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    const idx = Number.parseInt(String(vertexIndex), 10);
+    if (!room || !Number.isFinite(idx) || !room.cornersXz[idx]) return null;
+    return clonePoint(room.cornersXz[idx]);
+  }
+
+  function updateRoomVertex(unit, vertexIndex, point = {}) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    const idx = Number.parseInt(String(vertexIndex), 10);
+    const x = Number.parseFloat(point.x);
+    const z = Number.parseFloat(point.z);
+    if (!room || !Number.isFinite(idx) || !room.cornersXz[idx] || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+    room.cornersXz[idx] = [round6(x), round6(z)];
+    rebuildRoomGeometry(room, sceneY);
+    applyRoomVisual(room, state.selectedRoom === room);
+    syncVertexInputs();
+    return getRoomVertex(unit, idx);
+  }
+
   function focusRoom(room) {
     if (!room || !controls || !camera) return;
-    const focusDistance = Math.min(1.35, Math.max(0.72, roomFootprintSize(room) * 4.8));
-    controls.target.set(room.center.x, sceneY, room.center.z);
+    const center = displayedCenter(room);
+    const focusDistance = Math.min(1.35, Math.max(0.72, roomFootprintSize(room) * state.floorTransform.scale * 4.8));
+    controls.target.set(center.x, center.y, center.z);
     camera.position.set(
-      room.center.x + focusDistance * 0.22,
+      center.x + focusDistance * 0.22,
       sceneY + focusDistance * 1.16,
-      room.center.z + focusDistance * 0.38
+      center.z + focusDistance * 0.38
     );
     controls.update();
   }
@@ -285,6 +453,7 @@ export function initRoomKmlOverlay({
       if (syncInput && input) input.value = String(state.selectedRoom.unit);
       setStatus(`Room ${state.selectedRoom.unit}`);
       document.documentElement.dataset.selectedRoom = String(state.selectedRoom.unit);
+      syncVertexInputs();
       if (focus && controls) {
         focusRoom(state.selectedRoom);
       }
@@ -292,6 +461,7 @@ export function initRoomKmlOverlay({
       if (syncInput && input) input.value = '';
       setStatus(`Loaded ${state.rooms.size} rooms`);
       delete document.documentElement.dataset.selectedRoom;
+      syncVertexInputs();
     }
   }
 
@@ -341,8 +511,8 @@ export function initRoomKmlOverlay({
     camera.updateProjectionMatrix?.();
     camera.updateMatrixWorld?.(true);
     const rect = renderer.domElement.getBoundingClientRect();
-    const projected = room.cornersXz.map(([x, z]) => {
-      const point = new Vector3(x, sceneY + 0.025, z).project(camera);
+    const projected = room.cornersXz.map((corner) => {
+      const point = displayedPoint(corner, sceneY + 0.025).project(camera);
       return {
         x: round6((point.x + 1) * 0.5 * rect.width),
         y: round6((1 - point.y) * 0.5 * rect.height),
@@ -381,11 +551,12 @@ export function initRoomKmlOverlay({
     const currentDistance = Math.max(0.58, camera.position.distanceTo(controls.target) * distanceScale);
     const clampedElevation = Math.min(1.1, Math.max(0.35, Number(elevationRatio) || 0.7));
     const horizontalDistance = Math.max(0.28, currentDistance * Math.sqrt(Math.max(0.08, 1 - clampedElevation * clampedElevation)));
-    controls.target.set(room.center.x, sceneY, room.center.z);
+    const center = displayedCenter(room);
+    controls.target.set(center.x, center.y, center.z);
     camera.position.set(
-      room.center.x + Math.cos(azimuth) * horizontalDistance,
+      center.x + Math.cos(azimuth) * horizontalDistance,
       sceneY + currentDistance * clampedElevation,
-      room.center.z + Math.sin(azimuth) * horizontalDistance
+      center.z + Math.sin(azimuth) * horizontalDistance
     );
     controls.update();
     return getRoomScreenState(room.unit);
@@ -403,6 +574,55 @@ export function initRoomKmlOverlay({
       panel.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
     });
   }
+  if (editorPanel) {
+    ['pointerdown', 'click', 'touchstart'].forEach((eventName) => {
+      editorPanel.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
+    });
+  }
+
+  if (editorToggle) {
+    editorToggle.addEventListener('click', () => setEditorOpen(!state.editorOpen));
+  }
+  if (planTab) planTab.addEventListener('click', () => setEditorMode('plan'));
+  if (vertexTab) vertexTab.addEventListener('click', () => setEditorMode('vertex'));
+
+  function applyPlanInputs() {
+    setFloorTransform({
+      centerX: centerXInput?.value,
+      centerZ: centerZInput?.value,
+      rotationDeg: rotationInput?.value,
+      scale: scaleInput?.value,
+    });
+  }
+
+  [centerXInput, centerZInput, rotationInput, scaleInput].forEach((field) => {
+    if (!field) return;
+    field.addEventListener('input', applyPlanInputs);
+    field.addEventListener('change', applyPlanInputs);
+  });
+  if (resetTransformButton) resetTransformButton.addEventListener('click', resetFloorTransform);
+
+  if (vertexSelect) {
+    vertexSelect.addEventListener('change', () => {
+      state.selectedVertexIndex = Number.parseInt(vertexSelect.value, 10) || 0;
+      syncVertexInputs();
+    });
+  }
+
+  function applyVertexInputs() {
+    if (!state.selectedRoom) return;
+    updateRoomVertex(state.selectedRoom.unit, state.selectedVertexIndex, {
+      x: vertexXInput?.value,
+      z: vertexZInput?.value,
+    });
+  }
+
+  [vertexXInput, vertexZInput].forEach((field) => {
+    if (!field) return;
+    field.addEventListener('input', applyVertexInputs);
+    field.addEventListener('change', applyVertexInputs);
+  });
+  if (applyVertexButton) applyVertexButton.addEventListener('click', applyVertexInputs);
 
   if (input) {
     input.addEventListener('input', () => {
@@ -432,6 +652,20 @@ export function initRoomKmlOverlay({
       state.rooms.set(room.unit, room);
       state.group.add(room.group);
     });
+    state.floorBaseCenter = {
+      x: round6((transform.scene.minX + transform.scene.maxX) / 2),
+      z: round6((transform.scene.minZ + transform.scene.maxZ) / 2),
+    };
+    state.floorTransform = {
+      centerX: state.floorBaseCenter.x,
+      centerZ: state.floorBaseCenter.z,
+      rotationDeg: 0,
+      scale: 1,
+    };
+    applyFloorTransform();
+    syncPlanInputs();
+    setEditorMode('plan');
+    syncVertexInputs();
     document.documentElement.dataset.roomOverlayReady = 'true';
     setStatus(`Loaded ${state.rooms.size} rooms`);
     return state.rooms.size;
@@ -457,8 +691,18 @@ export function initRoomKmlOverlay({
     },
     getRoomBounds(unit) {
       const room = state.rooms.get(Number.parseInt(String(unit), 10));
-      return room ? room.cornersXz.map((point) => [...point]) : null;
+      return room ? room.cornersXz.map((point) => {
+        const displayed = displayedPoint(point);
+        return [round6(displayed.x), round6(displayed.z)];
+      }) : null;
     },
+    getRoomVertex,
+    updateRoomVertex,
+    getFloorTransform,
+    setFloorTransform,
+    resetFloorTransform,
+    setEditorOpen,
+    setEditorMode,
     getRoomScreenState(unit) {
       return getRoomScreenState(unit);
     },

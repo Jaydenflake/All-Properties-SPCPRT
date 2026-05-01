@@ -1416,6 +1416,20 @@
         .room-lookup-clear:hover {
             background: rgba(191, 40, 27, 0.65);
         }
+        .room-lookup-edit {
+            height: 31px;
+            border: 0;
+            border-radius: 16px;
+            padding: 0 11px;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.92);
+            background: rgba(255, 255, 255, 0.14);
+            font: 600 12px/31px "Helvetica Neue", Arial, sans-serif;
+        }
+        .room-lookup-edit.active {
+            color: #1f1f1f;
+            background: #ffd047;
+        }
         .room-lookup-status {
             min-width: 88px;
             max-width: 128px;
@@ -1426,18 +1440,125 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .room-kml-editor-panel {
+            position: fixed;
+            top: 66px;
+            left: 12px;
+            z-index: 12;
+            width: 286px;
+            max-width: calc(100vw - 24px);
+            box-sizing: border-box;
+            border-radius: 20px;
+            padding: 12px;
+            color: rgba(255, 255, 255, 0.94);
+            background: rgba(32, 32, 32, 0.58);
+            -webkit-backdrop-filter: blur(45px);
+            backdrop-filter: blur(45px);
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            opacity: 0;
+            transform: translateY(8px) scale(0.98);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        .room-kml-editor-panel.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        .room-kml-editor-title {
+            font-size: 13px;
+            font-weight: 650;
+            margin-bottom: 10px;
+        }
+        .room-kml-editor-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .room-kml-tab {
+            height: 30px;
+            border: 0;
+            border-radius: 15px;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.76);
+            background: rgba(255, 255, 255, 0.1);
+            font: 600 12px/30px "Helvetica Neue", Arial, sans-serif;
+        }
+        .room-kml-tab.active {
+            color: #202020;
+            background: #ffd047;
+        }
+        .room-kml-editor-pane {
+            display: none;
+        }
+        .room-kml-editor-pane.active {
+            display: block;
+        }
+        .room-kml-editor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .room-kml-editor-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 0;
+        }
+        .room-kml-editor-field label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.72);
+        }
+        .room-kml-editor-field input,
+        .room-kml-editor-field select {
+            width: 100%;
+            height: 32px;
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font: 600 12px/1 "Helvetica Neue", Arial, sans-serif;
+            padding: 0 9px;
+            outline: none;
+        }
+        .room-kml-editor-action {
+            width: 100%;
+            height: 32px;
+            margin-top: 9px;
+            border: 0;
+            border-radius: 16px;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.14);
+            font: 650 12px/32px "Helvetica Neue", Arial, sans-serif;
+        }
+        .room-kml-editor-selected {
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.78);
+        }
         @media (max-width: 720px) {
             .room-lookup-panel {
                 top: 12px;
                 left: 12px;
-                max-width: calc(100vw - 92px);
+                max-width: calc(100vw - 24px);
+            }
+            .room-lookup-edit {
+                padding: 0 9px;
             }
             .room-lookup-status {
                 min-width: 58px;
                 max-width: 86px;
             }
+            .room-kml-editor-panel {
+                top: 118px;
+                left: 12px;
+                width: min(286px, calc(100vw - 24px));
+            }
             .editor-toggles-wrap {
-                top: 12px;
+                top: 66px;
                 right: 12px;
             }
             .animation-editor-panel {
@@ -1486,7 +1607,55 @@
         <label class="room-lookup-label" for="roomSearchInput">Room</label>
         <input id="roomSearchInput" class="room-lookup-input" type="number" inputmode="numeric" min="1" max="87" placeholder="#" autocomplete="off">
         <button id="roomClearButton" class="room-lookup-clear" type="button" aria-label="Clear room selection" title="Clear room selection">×</button>
+        <button id="roomKmlEditorToggle" class="room-lookup-edit" type="button" aria-pressed="false">Edit</button>
         <div id="roomLookupStatus" class="room-lookup-status">Loading</div>
+    </div>
+
+    <div id="roomKmlEditorPanel" class="room-kml-editor-panel" aria-live="polite">
+        <div class="room-kml-editor-title">Room KML</div>
+        <div class="room-kml-editor-tabs" role="tablist" aria-label="Room KML edit mode">
+            <button id="roomKmlPlanTab" class="room-kml-tab active" type="button">Plan</button>
+            <button id="roomKmlVertexTab" class="room-kml-tab" type="button">Vertex</button>
+        </div>
+        <div id="roomKmlPlanPane" class="room-kml-editor-pane active">
+            <div class="room-kml-editor-grid">
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlCenterX">Center X</label>
+                    <input id="roomKmlCenterX" type="number" step="0.001">
+                </div>
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlCenterZ">Center Z</label>
+                    <input id="roomKmlCenterZ" type="number" step="0.001">
+                </div>
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlRotation">Rotation</label>
+                    <input id="roomKmlRotation" type="number" step="0.1">
+                </div>
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlScale">Scale</label>
+                    <input id="roomKmlScale" type="number" step="0.01" min="0.05">
+                </div>
+            </div>
+            <button id="roomKmlResetTransform" class="room-kml-editor-action" type="button">Reset plan</button>
+        </div>
+        <div id="roomKmlVertexPane" class="room-kml-editor-pane">
+            <div id="roomKmlSelectedRoom" class="room-kml-editor-selected">Select a room</div>
+            <div class="room-kml-editor-grid">
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlVertexSelect">Vertex</label>
+                    <select id="roomKmlVertexSelect"></select>
+                </div>
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlVertexX">X</label>
+                    <input id="roomKmlVertexX" type="number" step="0.001">
+                </div>
+                <div class="room-kml-editor-field">
+                    <label for="roomKmlVertexZ">Z</label>
+                    <input id="roomKmlVertexZ" type="number" step="0.001">
+                </div>
+            </div>
+            <button id="roomKmlApplyVertex" class="room-kml-editor-action" type="button">Apply vertex</button>
+        </div>
     </div>
 
     <div class="editor-toggles-wrap" id="editorTogglesWrap">
@@ -2232,6 +2401,22 @@
                 input: document.getElementById('roomSearchInput'),
                 statusEl: document.getElementById('roomLookupStatus'),
                 clearButton: document.getElementById('roomClearButton'),
+                editorToggle: document.getElementById('roomKmlEditorToggle'),
+                editorPanel: document.getElementById('roomKmlEditorPanel'),
+                planTab: document.getElementById('roomKmlPlanTab'),
+                vertexTab: document.getElementById('roomKmlVertexTab'),
+                planPane: document.getElementById('roomKmlPlanPane'),
+                vertexPane: document.getElementById('roomKmlVertexPane'),
+                centerX: document.getElementById('roomKmlCenterX'),
+                centerZ: document.getElementById('roomKmlCenterZ'),
+                rotation: document.getElementById('roomKmlRotation'),
+                scale: document.getElementById('roomKmlScale'),
+                resetTransformButton: document.getElementById('roomKmlResetTransform'),
+                editorSelectedEl: document.getElementById('roomKmlSelectedRoom'),
+                vertexSelect: document.getElementById('roomKmlVertexSelect'),
+                vertexX: document.getElementById('roomKmlVertexX'),
+                vertexZ: document.getElementById('roomKmlVertexZ'),
+                applyVertexButton: document.getElementById('roomKmlApplyVertex'),
             },
         });
     }).catch(err => {

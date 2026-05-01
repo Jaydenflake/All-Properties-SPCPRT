@@ -64,6 +64,59 @@ async function selectRoom(page, unit) {
   unit, { timeout: 10000 });
 }
 
+async function verifyEditorControls(page) {
+  await page.click('#roomKmlEditorToggle');
+  await page.waitForFunction(() => document.getElementById('roomKmlEditorPanel').classList.contains('active'), null, { timeout: 10000 });
+
+  const originalTransform = await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform());
+  const targetTransform = {
+    centerX: Number((originalTransform.centerX + 0.025).toFixed(6)),
+    centerZ: Number((originalTransform.centerZ - 0.018).toFixed(6)),
+    rotationDeg: 3.5,
+    scale: 1.04,
+  };
+  await page.fill('#roomKmlCenterX', String(targetTransform.centerX));
+  await page.fill('#roomKmlCenterZ', String(targetTransform.centerZ));
+  await page.fill('#roomKmlRotation', String(targetTransform.rotationDeg));
+  await page.fill('#roomKmlScale', String(targetTransform.scale));
+  await page.waitForFunction((expected) => {
+    const current = window.__roomKmlOverlay.getFloorTransform();
+    return Math.abs(current.centerX - expected.centerX) < 0.00001 &&
+      Math.abs(current.centerZ - expected.centerZ) < 0.00001 &&
+      Math.abs(current.rotationDeg - expected.rotationDeg) < 0.00001 &&
+      Math.abs(current.scale - expected.scale) < 0.00001;
+  }, targetTransform, { timeout: 10000 });
+
+  await selectRoom(page, 23);
+  await page.click('#roomKmlVertexTab');
+  await page.waitForFunction(() => document.getElementById('roomKmlVertexPane').classList.contains('active'), null, { timeout: 10000 });
+  const originalVertex = await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0));
+  const targetVertex = [Number((originalVertex[0] + 0.012).toFixed(6)), Number((originalVertex[1] - 0.01).toFixed(6))];
+  await page.selectOption('#roomKmlVertexSelect', '0');
+  await page.fill('#roomKmlVertexX', String(targetVertex[0]));
+  await page.fill('#roomKmlVertexZ', String(targetVertex[1]));
+  await page.waitForFunction((expected) => {
+    const current = window.__roomKmlOverlay.getRoomVertex(23, 0);
+    return Math.abs(current[0] - expected[0]) < 0.00001 && Math.abs(current[1] - expected[1]) < 0.00001;
+  }, targetVertex, { timeout: 10000 });
+
+  await page.evaluate(({ transform, vertex }) => {
+    window.__roomKmlOverlay.updateRoomVertex(23, 0, { x: vertex[0], z: vertex[1] });
+    window.__roomKmlOverlay.setFloorTransform(transform);
+  }, { transform: originalTransform, vertex: originalVertex });
+  await page.click('#roomKmlPlanTab');
+  await page.click('#roomKmlEditorToggle');
+
+  return {
+    originalTransform,
+    targetTransform,
+    originalVertex,
+    targetVertex,
+    restoredTransform: await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform()),
+    restoredVertex: await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0)),
+  };
+}
+
 async function run() {
   const { chromium } = loadPlaywright();
   const url = process.argv[2] || process.env.ROOM_OVERLAY_URL || 'http://127.0.0.1:4173/Canyon-Vista/index.html';
@@ -97,6 +150,7 @@ async function run() {
     }));
     assert(initial.count === 87 && initial.first === 1 && initial.last === 87, 'Room overlay did not load Unit 1 through Unit 87', initial);
 
+    const editor = await verifyEditorControls(page);
     const checks = [];
     for (const unit of [23, 73, 1]) {
       await selectRoom(page, unit);
@@ -138,7 +192,7 @@ async function run() {
     const seriousErrors = pageErrors.concat(seriousConsoleMessages(consoleMessages));
     assert(seriousErrors.length === 0, 'Serious browser errors were reported', { seriousErrors });
 
-    console.log(JSON.stringify({ url, initial, checks, invalid, seriousErrors }, null, 2));
+    console.log(JSON.stringify({ url, initial, editor, checks, invalid, seriousErrors }, null, 2));
   } finally {
     await browser.close();
   }
