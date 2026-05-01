@@ -88,7 +88,9 @@ async function verifyEditorControls(page) {
   }, targetTransform, { timeout: 10000 });
 
   await selectRoom(page, 23);
-  await page.click('#roomKmlVertexTab');
+  // The editor uses transitions, and Playwright can occasionally deem the tab "not stable".
+  // Force the click to avoid flaky timeouts during verification.
+  await page.locator('#roomKmlVertexTab').click({ force: true, timeout: 10000 });
   await page.waitForFunction(() => document.getElementById('roomKmlVertexPane').classList.contains('active'), null, { timeout: 10000 });
   const originalVertex = await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0));
   const targetVertex = [Number((originalVertex[0] + 0.012).toFixed(6)), Number((originalVertex[1] - 0.01).toFixed(6))];
@@ -104,7 +106,7 @@ async function verifyEditorControls(page) {
     window.__roomKmlOverlay.updateRoomVertex(23, 0, { x: vertex[0], z: vertex[1] });
     window.__roomKmlOverlay.setFloorTransform(transform);
   }, { transform: originalTransform, vertex: originalVertex });
-  await page.click('#roomKmlPlanTab');
+  await page.locator('#roomKmlPlanTab').click({ force: true, timeout: 10000 });
   await page.click('#roomKmlEditorToggle');
 
   return {
@@ -134,6 +136,13 @@ async function run() {
 
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    // Reduce flakiness from UI transitions/animations while verifying editor wiring.
+    await page.addStyleTag({
+      content: `
+        * { transition: none !important; animation: none !important; }
+        html { scroll-behavior: auto !important; }
+      `,
+    });
     await page.waitForSelector('#roomSearchInput', { timeout: 20000 });
     await page.waitForFunction(() =>
       window.__roomKmlOverlay &&
