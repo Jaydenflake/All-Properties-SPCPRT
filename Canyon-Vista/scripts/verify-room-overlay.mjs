@@ -65,8 +65,11 @@ async function selectRoom(page, unit) {
 }
 
 async function verifyEditorControls(page) {
-  await page.click('#roomKmlEditorToggle');
-  await page.waitForFunction(() => document.getElementById('roomKmlEditorPanel').classList.contains('active'), null, { timeout: 10000 });
+  await page.click('#unitEditorToggle');
+  await page.waitForFunction(() =>
+    document.getElementById('unitEditorPanel').classList.contains('active') &&
+    document.getElementById('roomKmlEditorPanel').closest('#unitEditorPanel'),
+  null, { timeout: 10000 });
 
   const originalTransform = await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform());
   assert(originalTransform.rotationDeg === 0, 'editor: default plan rotation should be 0 for pancake-flipped overlay', originalTransform);
@@ -136,7 +139,7 @@ async function verifyEditorControls(page) {
     window.__roomKmlOverlay.setFloorTransform(transform);
   }, { transform: originalTransform, vertex: originalVertex });
   await page.locator('#roomKmlPlanTab').click({ force: true, timeout: 10000 });
-  await page.click('#roomKmlEditorToggle');
+  await page.click('#unitEditorToggle');
 
   return {
     originalTransform,

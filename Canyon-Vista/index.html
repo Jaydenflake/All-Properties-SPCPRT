@@ -1431,8 +1431,8 @@
             background: #ffd047;
         }
         .room-lookup-status {
-            min-width: 88px;
-            max-width: 128px;
+            min-width: 0;
+            max-width: 100%;
             font-size: 11px;
             line-height: 1.2;
             color: rgba(255, 255, 255, 0.72);
@@ -1440,29 +1440,44 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .floor-plan-panel {
+            width: 320px;
+            max-width: min(320px, calc(100vw - 24px));
+        }
+        .floor-plan-divider {
+            height: 1px;
+            margin: 12px 0;
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .floor-plan-panel .room-lookup-status {
+            display: block;
+            min-width: 0;
+            max-width: 100%;
+            margin: -4px 0 8px;
+        }
         .room-kml-editor-panel {
-            position: fixed;
-            top: 66px;
-            left: 12px;
-            z-index: 12;
-            width: 286px;
-            max-width: calc(100vw - 24px);
+            position: relative;
+            top: auto;
+            left: auto;
+            z-index: auto;
+            width: 100%;
+            max-width: none;
             box-sizing: border-box;
-            border-radius: 20px;
-            padding: 12px;
+            border-radius: 0;
+            padding: 0;
             color: rgba(255, 255, 255, 0.94);
-            background: rgba(32, 32, 32, 0.58);
-            -webkit-backdrop-filter: blur(45px);
-            backdrop-filter: blur(45px);
+            background: transparent;
+            -webkit-backdrop-filter: none;
+            backdrop-filter: none;
             font-family: "Helvetica Neue", Arial, sans-serif;
-            opacity: 0;
-            transform: translateY(8px) scale(0.98);
-            pointer-events: none;
-            transition: opacity 0.18s ease, transform 0.18s ease;
+            opacity: 1;
+            transform: none;
+            pointer-events: auto;
+            transition: none;
         }
         .room-kml-editor-panel.active {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: none;
             pointer-events: auto;
         }
         .room-kml-editor-title {
@@ -1565,11 +1580,6 @@
                 min-width: 58px;
                 max-width: 86px;
             }
-            .room-kml-editor-panel {
-                top: 118px;
-                left: 12px;
-                width: min(286px, calc(100vw - 24px));
-            }
             .editor-toggles-wrap {
                 top: 66px;
                 right: 12px;
@@ -1578,6 +1588,9 @@
                 right: 12px;
                 top: 66px;
                 width: min(260px, calc(100vw - 24px));
+            }
+            .floor-plan-panel {
+                width: min(320px, calc(100vw - 24px));
             }
             .splat-editor-panel {
                 left: 12px;
@@ -1620,59 +1633,6 @@
         <label class="room-lookup-label" for="roomSearchInput">Room</label>
         <input id="roomSearchInput" class="room-lookup-input" type="number" inputmode="numeric" min="1" max="87" placeholder="#" autocomplete="off">
         <button id="roomClearButton" class="room-lookup-clear" type="button" aria-label="Clear room selection" title="Clear room selection">×</button>
-        <button id="roomKmlEditorToggle" class="room-lookup-edit" type="button" aria-pressed="false">Edit</button>
-        <div id="roomLookupStatus" class="room-lookup-status">Loading</div>
-    </div>
-
-    <div id="roomKmlEditorPanel" class="room-kml-editor-panel" aria-live="polite">
-        <div class="room-kml-editor-title">Room KML</div>
-        <div class="room-kml-editor-tabs" role="tablist" aria-label="Room KML edit mode">
-            <button id="roomKmlPlanTab" class="room-kml-tab active" type="button">Plan</button>
-            <button id="roomKmlVertexTab" class="room-kml-tab" type="button">Vertex</button>
-        </div>
-        <div id="roomKmlPlanPane" class="room-kml-editor-pane active">
-            <div class="room-kml-editor-grid">
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlCenterX">Center X</label>
-                    <input id="roomKmlCenterX" type="number" step="0.001">
-                </div>
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlCenterZ">Center Z</label>
-                    <input id="roomKmlCenterZ" type="number" step="0.001">
-                </div>
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlRotation">Rotation</label>
-                    <input id="roomKmlRotation" type="number" step="0.1">
-                </div>
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlScale">Scale</label>
-                    <input id="roomKmlScale" type="number" step="0.01" min="0.05">
-                </div>
-            </div>
-            <label class="room-kml-editor-check" for="roomKmlFlipX">
-                <input id="roomKmlFlipX" type="checkbox">
-                <span>Pancake flip</span>
-            </label>
-            <button id="roomKmlResetTransform" class="room-kml-editor-action" type="button">Reset plan</button>
-        </div>
-        <div id="roomKmlVertexPane" class="room-kml-editor-pane">
-            <div id="roomKmlSelectedRoom" class="room-kml-editor-selected">Select a room</div>
-            <div class="room-kml-editor-grid">
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlVertexSelect">Vertex</label>
-                    <select id="roomKmlVertexSelect"></select>
-                </div>
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlVertexX">X</label>
-                    <input id="roomKmlVertexX" type="number" step="0.001">
-                </div>
-                <div class="room-kml-editor-field">
-                    <label for="roomKmlVertexZ">Z</label>
-                    <input id="roomKmlVertexZ" type="number" step="0.001">
-                </div>
-            </div>
-            <button id="roomKmlApplyVertex" class="room-kml-editor-action" type="button">Apply vertex</button>
-        </div>
     </div>
 
     <div class="editor-toggles-wrap" id="editorTogglesWrap">
@@ -1799,8 +1759,61 @@
         </div>
     </div>
 
-    <div id="unitEditorPanel" class="lot-editor-panel animation-editor-panel" aria-live="polite">
-        <div class="lot-editor-title">Unit extrude</div>
+    <div id="unitEditorPanel" class="lot-editor-panel animation-editor-panel floor-plan-panel" aria-live="polite">
+        <div class="lot-editor-title">Floor plan</div>
+        <div id="roomKmlEditorPanel" class="room-kml-editor-panel active" aria-live="polite">
+            <div class="room-kml-editor-title">Room KML</div>
+            <div id="roomLookupStatus" class="room-lookup-status">Loading</div>
+            <div class="room-kml-editor-tabs" role="tablist" aria-label="Room KML edit mode">
+                <button id="roomKmlPlanTab" class="room-kml-tab active" type="button">Plan</button>
+                <button id="roomKmlVertexTab" class="room-kml-tab" type="button">Vertex</button>
+            </div>
+            <div id="roomKmlPlanPane" class="room-kml-editor-pane active">
+                <div class="room-kml-editor-grid">
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlCenterX">Center X</label>
+                        <input id="roomKmlCenterX" type="number" step="0.001">
+                    </div>
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlCenterZ">Center Z</label>
+                        <input id="roomKmlCenterZ" type="number" step="0.001">
+                    </div>
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlRotation">Rotation</label>
+                        <input id="roomKmlRotation" type="number" step="0.1">
+                    </div>
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlScale">Scale</label>
+                        <input id="roomKmlScale" type="number" step="0.01" min="0.05">
+                    </div>
+                </div>
+                <label class="room-kml-editor-check" for="roomKmlFlipX">
+                    <input id="roomKmlFlipX" type="checkbox">
+                    <span>Pancake flip</span>
+                </label>
+                <button id="roomKmlResetTransform" class="room-kml-editor-action" type="button">Reset plan</button>
+            </div>
+            <div id="roomKmlVertexPane" class="room-kml-editor-pane">
+                <div id="roomKmlSelectedRoom" class="room-kml-editor-selected">Select a room</div>
+                <div class="room-kml-editor-grid">
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlVertexSelect">Vertex</label>
+                        <select id="roomKmlVertexSelect"></select>
+                    </div>
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlVertexX">X</label>
+                        <input id="roomKmlVertexX" type="number" step="0.001">
+                    </div>
+                    <div class="room-kml-editor-field">
+                        <label for="roomKmlVertexZ">Z</label>
+                        <input id="roomKmlVertexZ" type="number" step="0.001">
+                    </div>
+                </div>
+                <button id="roomKmlApplyVertex" class="room-kml-editor-action" type="button">Apply vertex</button>
+            </div>
+        </div>
+        <div class="floor-plan-divider"></div>
+        <div class="lot-editor-title">Floor slabs</div>
         <div id="unitEditorStatus" class="lot-editor-status">units/units.json</div>
         <div id="unitEditorSelected" class="lot-editor-vertex">Unit: none</div>
         <div class="lot-editor-grid">
@@ -2418,7 +2431,7 @@
                 input: document.getElementById('roomSearchInput'),
                 statusEl: document.getElementById('roomLookupStatus'),
                 clearButton: document.getElementById('roomClearButton'),
-                editorToggle: document.getElementById('roomKmlEditorToggle'),
+                editorToggle: null,
                 editorPanel: document.getElementById('roomKmlEditorPanel'),
                 planTab: document.getElementById('roomKmlPlanTab'),
                 vertexTab: document.getElementById('roomKmlVertexTab'),

@@ -18,8 +18,11 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn('id="roomLookupPanel"', html)
         self.assertIn('id="roomSearchInput"', html)
         self.assertIn('id="roomLookupStatus"', html)
-        self.assertIn('id="roomKmlEditorToggle"', html)
+        self.assertIn('id="unitEditorToggle"', html)
+        self.assertIn('id="unitEditorPanel" class="lot-editor-panel animation-editor-panel floor-plan-panel"', html)
         self.assertIn('id="roomKmlEditorPanel"', html)
+        self.assertLess(html.index('id="unitEditorPanel"'), html.index('id="roomKmlEditorPanel"'))
+        self.assertNotIn('id="roomKmlEditorToggle"', html)
         self.assertIn('id="roomKmlPlanTab"', html)
         self.assertIn('id="roomKmlVertexTab"', html)
         self.assertIn('id="roomKmlCenterX"', html)
@@ -29,6 +32,7 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn("../shared/unit-kml-overlay.mjs", html)
         self.assertIn("exports/canyon-vista-units.kml", html)
         self.assertIn("pauseCameraAutomation: pauseCameraAutomationFromInteraction", html)
+        self.assertIn("editorToggle: null", html)
 
     def test_overlay_module_exposes_runtime_api(self) -> None:
         source = MODULE_PATH.read_text(encoding="utf-8")
