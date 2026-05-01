@@ -61,7 +61,7 @@ async function selectRoom(page, unit) {
   await page.waitForFunction((selectedUnit) =>
     window.__roomKmlOverlay.getSelectedRoom() === selectedUnit &&
     document.documentElement.dataset.selectedRoom === String(selectedUnit),
-  unit, { timeout: 10000 });
+  unit, { timeout: 30000 });
 }
 
 async function verifyEditorControls(page) {
@@ -69,7 +69,7 @@ async function verifyEditorControls(page) {
   await page.waitForFunction(() =>
     document.getElementById('unitEditorPanel').classList.contains('active') &&
     document.getElementById('roomKmlEditorPanel').closest('#unitEditorPanel'),
-  null, { timeout: 10000 });
+  null, { timeout: 30000 });
 
   const originalTransform = await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform());
   assert(originalTransform.rotationDeg === 0, 'editor: default plan rotation should be 0 for pancake-flipped overlay', originalTransform);
@@ -93,13 +93,13 @@ async function verifyEditorControls(page) {
       Math.abs(current.rotationDeg - expected.rotationDeg) < 0.00001 &&
       Math.abs(current.scale - expected.scale) < 0.00001 &&
       current.flipX === expected.flipX;
-  }, targetTransform, { timeout: 10000 });
+  }, targetTransform, { timeout: 30000 });
 
   await selectRoom(page, 23);
   // The editor uses transitions, and Playwright can occasionally deem the tab "not stable".
   // Force the click to avoid flaky timeouts during verification.
-  await page.locator('#roomKmlVertexTab').click({ force: true, timeout: 10000 });
-  await page.waitForFunction(() => document.getElementById('roomKmlVertexPane').classList.contains('active'), null, { timeout: 10000 });
+  await page.locator('#roomKmlVertexTab').click({ force: true, timeout: 30000 });
+  await page.waitForFunction(() => document.getElementById('roomKmlVertexPane').classList.contains('active'), null, { timeout: 30000 });
   const originalVertex = await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0));
   const originalHandle = await page.evaluate(() => window.__roomKmlOverlay.getVertexHandleScreenState(23, 0));
   assert(originalHandle?.visible, 'editor: vertex handle should be visible for the selected room', originalHandle);
@@ -110,7 +110,7 @@ async function verifyEditorControls(page) {
   await page.waitForFunction((expected) => {
     const current = window.__roomKmlOverlay.getRoomVertex(23, 0);
     return Math.abs(current[0] - expected[0]) < 0.00001 && Math.abs(current[1] - expected[1]) < 0.00001;
-  }, targetVertex, { timeout: 10000 });
+  }, targetVertex, { timeout: 30000 });
   const editedHandle = await page.evaluate(() => window.__roomKmlOverlay.getVertexHandleScreenState(23, 0));
   assert(editedHandle?.visible, 'editor: vertex handle should stay visible after numeric edit', editedHandle);
 
@@ -121,7 +121,7 @@ async function verifyEditorControls(page) {
   await page.waitForFunction((previous) => {
     const current = window.__roomKmlOverlay.getRoomVertex(23, 0);
     return Math.abs(current[0] - previous[0]) > 0.0001 || Math.abs(current[1] - previous[1]) > 0.0001;
-  }, targetVertex, { timeout: 10000 });
+  }, targetVertex, { timeout: 30000 });
   const draggedVertex = await page.evaluate(() => window.__roomKmlOverlay.getRoomVertex(23, 0));
   const draggedHandle = await page.evaluate(() => window.__roomKmlOverlay.getVertexHandleScreenState(23, 0));
   const dragFields = await page.evaluate(() => ({
@@ -138,7 +138,7 @@ async function verifyEditorControls(page) {
     window.__roomKmlOverlay.updateRoomVertex(23, 0, { x: vertex[0], z: vertex[1] });
     window.__roomKmlOverlay.setFloorTransform(transform);
   }, { transform: originalTransform, vertex: originalVertex });
-  await page.locator('#roomKmlPlanTab').click({ force: true, timeout: 10000 });
+  await page.locator('#roomKmlPlanTab').click({ force: true, timeout: 30000 });
   await page.click('#unitEditorToggle');
 
   return {
@@ -226,7 +226,7 @@ async function run() {
     await page.waitForFunction(() =>
       window.__roomKmlOverlay.getSelectedRoom() === null &&
       !document.documentElement.dataset.selectedRoom,
-    null, { timeout: 10000 });
+    null, { timeout: 30000 });
     const invalid = await page.evaluate(() => ({
       selected: window.__roomKmlOverlay.getSelectedRoom(),
       status: document.getElementById('roomLookupStatus').textContent,

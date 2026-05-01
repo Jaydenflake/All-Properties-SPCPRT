@@ -70,14 +70,15 @@ async function listenWithFallback() {
   for (let port = initialPort; port <= maxPort; port += 1) {
     const server = createAppServer();
     const result = await new Promise((resolvePromise) => {
-      server.once('error', (error) => resolvePromise({ ok: false, error }));
-      server.once('listening', () => resolvePromise({ ok: true, port }));
+      server.once('error', (error) => resolvePromise({ ok: false, error, server }));
+      server.once('listening', () => resolvePromise({ ok: true, port, server }));
       server.listen(port, host);
     });
 
     if (result.ok) {
       console.log(`Canyon Vista server running at http://${host}:${result.port}`);
-      return;
+      process.on('SIGINT', () => result.server.close(() => process.exit(0)));
+      await new Promise(() => {});
     }
 
     if (result.error && result.error.code === 'EADDRINUSE') {
