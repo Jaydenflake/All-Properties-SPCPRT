@@ -1523,6 +1523,19 @@
             padding: 0 9px;
             outline: none;
         }
+        .room-kml-editor-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 9px;
+            color: rgba(255, 255, 255, 0.82);
+            font: 650 12px/1.2 "Helvetica Neue", Arial, sans-serif;
+        }
+        .room-kml-editor-check input {
+            width: 16px;
+            height: 16px;
+            accent-color: #ffd047;
+        }
         .room-kml-editor-action {
             width: 100%;
             height: 32px;
@@ -1636,6 +1649,10 @@
                     <input id="roomKmlScale" type="number" step="0.01" min="0.05">
                 </div>
             </div>
+            <label class="room-kml-editor-check" for="roomKmlFlipX">
+                <input id="roomKmlFlipX" type="checkbox">
+                <span>Pancake flip</span>
+            </label>
             <button id="roomKmlResetTransform" class="room-kml-editor-action" type="button">Reset plan</button>
         </div>
         <div id="roomKmlVertexPane" class="room-kml-editor-pane">
@@ -2411,6 +2428,7 @@
                 centerZ: document.getElementById('roomKmlCenterZ'),
                 rotation: document.getElementById('roomKmlRotation'),
                 scale: document.getElementById('roomKmlScale'),
+                flipX: document.getElementById('roomKmlFlipX'),
                 resetTransformButton: document.getElementById('roomKmlResetTransform'),
                 editorSelectedEl: document.getElementById('roomKmlSelectedRoom'),
                 vertexSelect: document.getElementById('roomKmlVertexSelect'),

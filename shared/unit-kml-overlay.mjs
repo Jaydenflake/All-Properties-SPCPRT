@@ -28,7 +28,8 @@ const NORMAL_LINE_COLOR = 0xf2f2f2;
 const SELECTED_LINE_COLOR = 0xffd047;
 const NORMAL_FILL_COLOR = 0xff6b35;
 const SELECTED_FILL_COLOR = 0xffd047;
-const DEFAULT_FLOOR_ROTATION_DEG = 180;
+const DEFAULT_FLOOR_ROTATION_DEG = 0;
+const DEFAULT_FLOOR_FLIP_X = true;
 
 function round6(n) {
   return Math.round(n * 1e6) / 1e6;
@@ -278,7 +279,13 @@ export function initRoomKmlOverlay({
     editorOpen: false,
     editorMode: 'plan',
     floorBaseCenter: { x: 0, z: 0 },
-    floorTransform: { centerX: 0, centerZ: 0, rotationDeg: DEFAULT_FLOOR_ROTATION_DEG, scale: 1 },
+    floorTransform: {
+      centerX: 0,
+      centerZ: 0,
+      rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
+      scale: 1,
+      flipX: DEFAULT_FLOOR_FLIP_X,
+    },
     group: new Group(),
     raycaster: new Raycaster(),
     ndc: new Vector2(),
@@ -302,6 +309,7 @@ export function initRoomKmlOverlay({
   const centerZInput = elements.centerZ || null;
   const rotationInput = elements.rotation || null;
   const scaleInput = elements.scale || null;
+  const flipXInput = elements.flipX || null;
   const resetTransformButton = elements.resetTransformButton || null;
   const editorSelectedEl = elements.editorSelectedEl || null;
   const vertexSelect = elements.vertexSelect || null;
@@ -327,9 +335,9 @@ export function initRoomKmlOverlay({
   }
 
   function applyFloorTransform() {
-    const { centerX, centerZ, rotationDeg, scale } = state.floorTransform;
+    const { centerX, centerZ, rotationDeg, scale, flipX } = state.floorTransform;
     const moveToOrigin = new Matrix4().makeTranslation(-state.floorBaseCenter.x, 0, -state.floorBaseCenter.z);
-    const scaleMatrix = new Matrix4().makeScale(scale, 1, scale);
+    const scaleMatrix = new Matrix4().makeScale(scale * (flipX ? -1 : 1), 1, scale);
     const rotationMatrix = new Matrix4().makeRotationY((rotationDeg * Math.PI) / 180);
     const moveToCenter = new Matrix4().makeTranslation(centerX, 0, centerZ);
     state.group.matrix.identity();
@@ -342,6 +350,7 @@ export function initRoomKmlOverlay({
     if (centerZInput) centerZInput.value = formatNumber(state.floorTransform.centerZ);
     if (rotationInput) rotationInput.value = formatNumber(state.floorTransform.rotationDeg);
     if (scaleInput) scaleInput.value = formatNumber(state.floorTransform.scale);
+    if (flipXInput) flipXInput.checked = !!state.floorTransform.flipX;
   }
 
   function setFloorTransform(next = {}) {
@@ -353,6 +362,11 @@ export function initRoomKmlOverlay({
     if (Number.isFinite(centerZ)) state.floorTransform.centerZ = round6(centerZ);
     if (Number.isFinite(rotationDeg)) state.floorTransform.rotationDeg = round6(rotationDeg);
     if (Number.isFinite(scale)) state.floorTransform.scale = round6(Math.max(0.05, Math.min(20, scale)));
+    if (typeof next.flipX === 'boolean') {
+      state.floorTransform.flipX = next.flipX;
+    } else if (typeof next.flipX === 'string') {
+      state.floorTransform.flipX = ['1', 'true', 'on', 'yes'].includes(next.flipX.toLowerCase());
+    }
     applyFloorTransform();
     syncPlanInputs();
     return getFloorTransform();
@@ -368,6 +382,7 @@ export function initRoomKmlOverlay({
       centerZ: state.floorBaseCenter.z,
       rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
       scale: 1,
+      flipX: DEFAULT_FLOOR_FLIP_X,
     };
     applyFloorTransform();
     syncPlanInputs();
@@ -593,6 +608,7 @@ export function initRoomKmlOverlay({
       centerZ: centerZInput?.value,
       rotationDeg: rotationInput?.value,
       scale: scaleInput?.value,
+      flipX: flipXInput?.checked,
     });
   }
 
@@ -601,6 +617,9 @@ export function initRoomKmlOverlay({
     field.addEventListener('input', applyPlanInputs);
     field.addEventListener('change', applyPlanInputs);
   });
+  if (flipXInput) {
+    flipXInput.addEventListener('change', applyPlanInputs);
+  }
   if (resetTransformButton) resetTransformButton.addEventListener('click', resetFloorTransform);
 
   if (vertexSelect) {
@@ -662,6 +681,7 @@ export function initRoomKmlOverlay({
       centerZ: state.floorBaseCenter.z,
       rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
       scale: 1,
+      flipX: DEFAULT_FLOOR_FLIP_X,
     };
     applyFloorTransform();
     syncPlanInputs();

@@ -69,22 +69,27 @@ async function verifyEditorControls(page) {
   await page.waitForFunction(() => document.getElementById('roomKmlEditorPanel').classList.contains('active'), null, { timeout: 10000 });
 
   const originalTransform = await page.evaluate(() => window.__roomKmlOverlay.getFloorTransform());
+  assert(originalTransform.rotationDeg === 0, 'editor: default plan rotation should be 0 for pancake-flipped overlay', originalTransform);
+  assert(originalTransform.flipX === true, 'editor: default plan should use the pancake flip', originalTransform);
   const targetTransform = {
     centerX: Number((originalTransform.centerX + 0.025).toFixed(6)),
     centerZ: Number((originalTransform.centerZ - 0.018).toFixed(6)),
     rotationDeg: Number((originalTransform.rotationDeg + 3.5).toFixed(6)),
     scale: 1.04,
+    flipX: false,
   };
   await page.fill('#roomKmlCenterX', String(targetTransform.centerX));
   await page.fill('#roomKmlCenterZ', String(targetTransform.centerZ));
   await page.fill('#roomKmlRotation', String(targetTransform.rotationDeg));
   await page.fill('#roomKmlScale', String(targetTransform.scale));
+  await page.setChecked('#roomKmlFlipX', targetTransform.flipX);
   await page.waitForFunction((expected) => {
     const current = window.__roomKmlOverlay.getFloorTransform();
     return Math.abs(current.centerX - expected.centerX) < 0.00001 &&
       Math.abs(current.centerZ - expected.centerZ) < 0.00001 &&
       Math.abs(current.rotationDeg - expected.rotationDeg) < 0.00001 &&
-      Math.abs(current.scale - expected.scale) < 0.00001;
+      Math.abs(current.scale - expected.scale) < 0.00001 &&
+      current.flipX === expected.flipX;
   }, targetTransform, { timeout: 10000 });
 
   await selectRoom(page, 23);
