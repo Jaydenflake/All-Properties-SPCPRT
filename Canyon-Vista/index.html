@@ -1336,7 +1336,106 @@
         .lot-midpoint-plus:hover {
             background: rgba(191, 40, 27, 0.85);
         }
+        .room-lookup-panel {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 12;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 45px;
+            padding: 7px 8px 7px 12px;
+            box-sizing: border-box;
+            border-radius: 23.5px;
+            color: rgba(255, 255, 255, 0.92);
+            background: rgba(128, 128, 128, 0.32);
+            -webkit-backdrop-filter: blur(50px);
+            backdrop-filter: blur(50px);
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            pointer-events: auto;
+        }
+        .room-lookup-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 41%, rgba(255, 255, 255, 0) 57%, rgba(255, 255, 255, 0.4) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            padding: 1.4px;
+            pointer-events: none;
+        }
+        .room-lookup-panel > * {
+            position: relative;
+            z-index: 1;
+        }
+        .room-lookup-label {
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .room-lookup-input {
+            width: 66px;
+            height: 31px;
+            box-sizing: border-box;
+            border: 0;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            font: 600 14px/31px "Helvetica Neue", Arial, sans-serif;
+            text-align: center;
+            outline: none;
+        }
+        .room-lookup-input::placeholder {
+            color: rgba(255, 255, 255, 0.58);
+        }
+        .room-lookup-input:focus {
+            background: rgba(255, 255, 255, 0.26);
+            box-shadow: 0 0 0 2px rgba(255, 208, 71, 0.46);
+        }
+        .room-lookup-input::-webkit-outer-spin-button,
+        .room-lookup-input::-webkit-inner-spin-button {
+            margin: 0;
+            -webkit-appearance: none;
+        }
+        .room-lookup-clear {
+            width: 31px;
+            height: 31px;
+            border: 0;
+            border-radius: 50%;
+            padding: 0;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.92);
+            background: rgba(255, 255, 255, 0.14);
+            font: 500 20px/31px "Helvetica Neue", Arial, sans-serif;
+        }
+        .room-lookup-clear:hover {
+            background: rgba(191, 40, 27, 0.65);
+        }
+        .room-lookup-status {
+            min-width: 88px;
+            max-width: 128px;
+            font-size: 11px;
+            line-height: 1.2;
+            color: rgba(255, 255, 255, 0.72);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         @media (max-width: 720px) {
+            .room-lookup-panel {
+                top: 12px;
+                left: 12px;
+                max-width: calc(100vw - 92px);
+            }
+            .room-lookup-status {
+                min-width: 58px;
+                max-width: 86px;
+            }
             .editor-toggles-wrap {
                 top: 12px;
                 right: 12px;
@@ -1381,6 +1480,13 @@
         <div id="compassButton" class="menu-button">
             <img id="compassIcon" src="https://raw.githubusercontent.com/HansenHomeAI/FigmaSVGButtons/main/NorthOutline.svg" alt="Compass" draggable="false">
         </div>
+    </div>
+
+    <div id="roomLookupPanel" class="room-lookup-panel" aria-live="polite">
+        <label class="room-lookup-label" for="roomSearchInput">Room</label>
+        <input id="roomSearchInput" class="room-lookup-input" type="number" inputmode="numeric" min="1" max="87" placeholder="#" autocomplete="off">
+        <button id="roomClearButton" class="room-lookup-clear" type="button" aria-label="Clear room selection" title="Clear room selection">×</button>
+        <div id="roomLookupStatus" class="room-lookup-status">Loading</div>
     </div>
 
     <div class="editor-toggles-wrap" id="editorTogglesWrap">
@@ -2111,6 +2217,27 @@
             },
         });
     }).catch(err => console.warn('unit-extrude-editor failed to load', err));
+
+    import('../shared/unit-kml-overlay.mjs').then(({ initRoomKmlOverlay }) => {
+        initRoomKmlOverlay({
+            scene,
+            camera,
+            controls,
+            renderer,
+            kmlUrl: 'exports/canyon-vista-units.kml',
+            borderDotPositions: borderDotPositionsByHole[0],
+            elements: {
+                panel: document.getElementById('roomLookupPanel'),
+                input: document.getElementById('roomSearchInput'),
+                statusEl: document.getElementById('roomLookupStatus'),
+                clearButton: document.getElementById('roomClearButton'),
+            },
+        });
+    }).catch(err => {
+        console.warn('unit-kml-overlay failed to load', err);
+        const roomLookupStatus = document.getElementById('roomLookupStatus');
+        if (roomLookupStatus) roomLookupStatus.textContent = 'Rooms unavailable';
+    });
 
     controls.addEventListener('change', () => {
         if (typeof tapFocusTransition !== 'undefined' && tapFocusTransition.active) return;
