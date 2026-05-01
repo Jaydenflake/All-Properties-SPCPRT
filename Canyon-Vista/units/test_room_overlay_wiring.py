@@ -20,6 +20,8 @@ class RoomOverlayWiringContract(unittest.TestCase):
         self.assertIn('id="roomLookupStatus"', html)
         self.assertIn('id="unitEditorToggle"', html)
         self.assertIn('id="unitEditorPanel" class="lot-editor-panel animation-editor-panel floor-plan-panel"', html)
+        self.assertIn(".floor-plan-panel.active *", html)
+        self.assertIn('.floor-plan-panel.active :is(button, input, select, textarea, label, a, [role="button"], [tabindex])', html)
         self.assertIn('id="roomKmlEditorPanel"', html)
         self.assertLess(html.index('id="unitEditorPanel"'), html.index('id="roomKmlEditorPanel"'))
         self.assertNotIn('id="roomKmlEditorToggle"', html)

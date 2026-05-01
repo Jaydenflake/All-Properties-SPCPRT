@@ -1455,6 +1455,15 @@
             max-width: 100%;
             margin: -4px 0 8px;
         }
+        .floor-plan-panel.active,
+        .floor-plan-panel.active *,
+        .floor-plan-panel.active .room-kml-editor-panel,
+        .floor-plan-panel.active .room-kml-editor-panel.active {
+            pointer-events: none;
+        }
+        .floor-plan-panel.active :is(button, input, select, textarea, label, a, [role="button"], [tabindex]) {
+            pointer-events: auto;
+        }
         .room-kml-editor-panel {
             position: relative;
             top: auto;

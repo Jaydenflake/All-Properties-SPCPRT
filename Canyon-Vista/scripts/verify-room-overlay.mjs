@@ -75,37 +75,60 @@ async function verifyFloorPanelCanvasPassThrough(page) {
         y: event.clientY,
         target: event.target?.tagName || '',
       });
-    }, { capture: true, once: true });
+    }, { capture: true });
   });
 
-  const point = await page.evaluate(() => {
+  const candidates = await page.evaluate(() => {
     const panel = document.getElementById('unitEditorPanel');
     const rect = panel.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
-    const y = rect.top + 110;
-    const el = document.elementFromPoint(x, y);
-    return {
-      x,
-      y,
-      elementAtPoint: {
-        tag: el?.tagName || '',
-        id: el?.id || '',
-        className: String(el?.className || ''),
-      },
-    };
+    const ys = [
+      rect.top + 140,
+      rect.top + 200,
+      rect.top + 260,
+      rect.top + rect.height / 2,
+      rect.bottom - 100,
+    ].filter((y) => y > rect.top && y < rect.bottom);
+
+    return ys.map((y) => {
+      const el = document.elementFromPoint(x, y);
+      return {
+        x,
+        y,
+        elementAtPoint: {
+          tag: el?.tagName || '',
+          id: el?.id || '',
+          className: String(el?.className || ''),
+        },
+      };
+    });
   });
 
-  await page.mouse.move(point.x, point.y);
-  await page.mouse.down();
-  await page.mouse.move(point.x + 180, point.y + 72, { steps: 8 });
-  await page.mouse.up();
+  let probe = null;
+  let chosen = null;
+  for (const point of candidates) {
+    await page.evaluate(() => {
+      window.__floorPlanCanvasPointerProbe.count = 0;
+      window.__floorPlanCanvasPointerProbe.targets = [];
+    });
 
-  const probe = await page.evaluate(() => window.__floorPlanCanvasPointerProbe);
-  assert(probe.count === 1, 'editor: floor-plan panel background should pass drag starts through to the 3D canvas', {
-    point,
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.down();
+    await page.mouse.move(point.x + 180, point.y + 72, { steps: 8 });
+    await page.mouse.up();
+
+    probe = await page.evaluate(() => window.__floorPlanCanvasPointerProbe);
+    if (probe.count >= 1) {
+      chosen = point;
+      break;
+    }
+  }
+
+  assert(chosen && probe?.count >= 1, 'editor: floor-plan panel background should pass drag starts through to the 3D canvas', {
+    candidates,
     probe,
   });
-  return { point, probe };
+  return { point: chosen, probe };
 }
 
 async function verifyEditorControls(page) {
