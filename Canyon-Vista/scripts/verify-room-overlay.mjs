@@ -231,12 +231,23 @@ async function run() {
   const { chromium } = loadPlaywright();
   const url = process.argv[2] || process.env.ROOM_OVERLAY_URL || 'http://127.0.0.1:4173/Canyon-Vista/index.html';
   const executablePath = process.env.CHROME_EXECUTABLE || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  const browser = await chromium.launch({
+  const overallTimeoutMs = Number.parseInt(process.env.VERIFY_ROOM_OVERLAY_TIMEOUT_MS || '180000', 10);
+  let browser = null;
+
+  const watchdog = setTimeout(() => {
+    console.error(`verify-room-overlay: TIMEOUT after ${overallTimeoutMs}ms`);
+    process.exit(1);
+  }, Number.isFinite(overallTimeoutMs) ? overallTimeoutMs : 180000);
+  watchdog.unref?.();
+
+  browser = await chromium.launch({
     headless: true,
     executablePath,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  page.setDefaultTimeout(30000);
+  page.setDefaultNavigationTimeout(60000);
   const consoleMessages = [];
   const pageErrors = [];
   page.on('console', (msg) => consoleMessages.push(`${msg.type()}: ${msg.text()}`));
@@ -311,7 +322,12 @@ async function run() {
 
     console.log(JSON.stringify({ url, initial, editor, checks, invalid, seriousErrors }, null, 2));
   } finally {
-    await browser.close();
+    if (!browser) return;
+    await Promise.race([
+      browser.close(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('verify-room-overlay: browser.close timeout')), 10000)),
+    ]);
+    clearTimeout(watchdog);
   }
 }
 
