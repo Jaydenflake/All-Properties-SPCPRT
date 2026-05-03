@@ -1449,26 +1449,17 @@
             margin: 12px 0;
             background: rgba(255, 255, 255, 0.12);
         }
-        .floor-plan-panel .room-lookup-status {
-            display: block;
-            min-width: 0;
-            max-width: 100%;
-            margin: -4px 0 8px;
-        }
-        .floor-plan-panel.active,
-        .floor-plan-panel.active *,
-        .floor-plan-panel.active .room-kml-editor-panel,
-        .floor-plan-panel.active .room-kml-editor-panel.active {
-            pointer-events: none;
-        }
-        .floor-plan-panel.active :is(button, input, select, textarea, label, a, [role="button"], [tabindex]) {
-            pointer-events: auto;
-        }
-        .room-kml-editor-panel {
-            position: relative;
-            top: auto;
-            left: auto;
-            z-index: auto;
+	        .floor-plan-panel .room-lookup-status {
+	            display: block;
+	            min-width: 0;
+	            max-width: 100%;
+	            margin: -4px 0 8px;
+	        }
+	        .room-kml-editor-panel {
+	            position: relative;
+	            top: auto;
+	            left: auto;
+	            z-index: auto;
             width: 100%;
             max-width: none;
             box-sizing: border-box;
@@ -2371,9 +2362,9 @@
     let camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, parameters.camera.maxZoomOut);
     camera.position.set(parameters.camera.startPosition.x, parameters.camera.startPosition.y, parameters.camera.startPosition.z);
 
-    let controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+	    let controls = new OrbitControls(camera, renderer.domElement);
+	    controls.enableDamping = true;
+	    controls.dampingFactor = 0.08;
     controls.zoomSpeed = 0.5;  // Original orbital: halved zoom sensitivity
     controls.minDistance = 0.6;
     controls.maxDistance = calculateMaxDistance();
@@ -2382,8 +2373,93 @@
     if ('zoomToCursor' in controls) {
         controls.zoomToCursor = true;
     }
-    controls.target.set(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
-    controls.update();
+	    controls.target.set(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
+	    controls.update();
+
+	    function enablePanelDragPassThrough(panel, canvas) {
+	        if (!panel || !canvas) return () => {};
+	        const interactiveSelector = 'button, input, select, textarea, label, a, [role="button"], [tabindex]';
+	        let forwardingPointerId = null;
+	        const forwardedFlag = '__panelForwarded';
+
+	        const isInteractiveTarget = (eventTarget) => {
+	            if (!(eventTarget instanceof Element)) return false;
+	            return Boolean(eventTarget.closest(interactiveSelector));
+	        };
+
+	        const forward = (event, type) => {
+	            if (event && event[forwardedFlag]) return;
+	            const init = {
+	                bubbles: true,
+	                cancelable: true,
+	                composed: true,
+	                pointerId: event.pointerId,
+	                pointerType: event.pointerType,
+	                isPrimary: event.isPrimary,
+	                button: event.button,
+	                buttons: event.buttons,
+	                clientX: event.clientX,
+	                clientY: event.clientY,
+	                screenX: event.screenX,
+	                screenY: event.screenY,
+	                ctrlKey: event.ctrlKey,
+	                shiftKey: event.shiftKey,
+	                altKey: event.altKey,
+	                metaKey: event.metaKey,
+	            };
+	            const synthetic = new PointerEvent(type, init);
+	            try {
+	                Object.defineProperty(synthetic, forwardedFlag, { value: true });
+	            } catch {
+	                // Ignore if the environment prevents property definition.
+	            }
+	            canvas.dispatchEvent(synthetic);
+	        };
+
+	        const onPointerDown = (event) => {
+	            if (!panel.classList.contains('active')) return;
+	            if (isInteractiveTarget(event.target)) return;
+	            forwardingPointerId = event.pointerId;
+	            event.preventDefault();
+	            forward(event, 'pointerdown');
+	        };
+
+	        const onPointerMove = (event) => {
+	            if (event && event[forwardedFlag]) return;
+	            if (forwardingPointerId === null || event.pointerId !== forwardingPointerId) return;
+	            event.preventDefault();
+	            forward(event, 'pointermove');
+	        };
+
+	        const onPointerUp = (event) => {
+	            if (event && event[forwardedFlag]) return;
+	            if (forwardingPointerId === null || event.pointerId !== forwardingPointerId) return;
+	            event.preventDefault();
+	            forward(event, 'pointerup');
+	            forwardingPointerId = null;
+	        };
+
+	        const onPointerCancel = (event) => {
+	            if (event && event[forwardedFlag]) return;
+	            if (forwardingPointerId === null || event.pointerId !== forwardingPointerId) return;
+	            forward(event, 'pointercancel');
+	            forwardingPointerId = null;
+	        };
+
+	        panel.addEventListener('pointerdown', onPointerDown, { capture: true });
+	        window.addEventListener('pointermove', onPointerMove, { capture: true });
+	        window.addEventListener('pointerup', onPointerUp, { capture: true });
+	        window.addEventListener('pointercancel', onPointerCancel, { capture: true });
+
+	        return () => {
+	            panel.removeEventListener('pointerdown', onPointerDown, { capture: true });
+	            window.removeEventListener('pointermove', onPointerMove, { capture: true });
+	            window.removeEventListener('pointerup', onPointerUp, { capture: true });
+	            window.removeEventListener('pointercancel', onPointerCancel, { capture: true });
+	        };
+	    }
+
+	    enablePanelDragPassThrough(document.getElementById('unitEditorPanel'), renderer.domElement);
 
     import('../shared/obj-home-editor.mjs').then(({ initObjHomeEditor }) => {
         window.__homeEditor = initObjHomeEditor({
