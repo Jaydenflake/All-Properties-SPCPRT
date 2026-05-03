@@ -153,7 +153,10 @@ async function verifyEditorControls(page) {
   await page.fill('#roomKmlCenterZ', String(targetTransform.centerZ));
   await page.fill('#roomKmlRotation', String(targetTransform.rotationDeg));
   await page.fill('#roomKmlScale', String(targetTransform.scale));
-  await page.setChecked('#roomKmlFlipX', targetTransform.flipX);
+  // The editor panel can scroll, so ensure the checkbox is interactable in headless runs.
+  const flipX = page.locator('#roomKmlFlipX');
+  await flipX.scrollIntoViewIfNeeded();
+  await flipX.setChecked(targetTransform.flipX, { force: true, timeout: 30000 });
   await page.waitForFunction((expected) => {
     const current = window.__roomKmlOverlay.getFloorTransform();
     return Math.abs(current.centerX - expected.centerX) < 0.00001 &&
