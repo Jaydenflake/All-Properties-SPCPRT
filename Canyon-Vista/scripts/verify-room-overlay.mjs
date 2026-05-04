@@ -155,7 +155,12 @@ async function verifyEditorControls(page) {
   await page.fill('#roomKmlScale', String(targetTransform.scale));
   // The editor panel can scroll, so ensure the checkbox is interactable in headless runs.
   const flipX = page.locator('#roomKmlFlipX');
-  await flipX.scrollIntoViewIfNeeded();
+  // `scrollIntoViewIfNeeded()` can be flaky in headless mode when the editor panel
+  // is reflowing; do a best-effort DOM scroll instead (force-click handles the rest).
+  await page.evaluate(() => {
+    const el = document.querySelector('#roomKmlFlipX');
+    el?.scrollIntoView?.({ block: 'center', inline: 'center' });
+  });
   await flipX.setChecked(targetTransform.flipX, { force: true, timeout: 30000 });
   await page.waitForFunction((expected) => {
     const current = window.__roomKmlOverlay.getFloorTransform();
