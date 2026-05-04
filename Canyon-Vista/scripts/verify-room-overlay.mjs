@@ -26,6 +26,37 @@ function seriousConsoleMessages(consoleMessages) {
   );
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function safeCloseBrowser(browser, timeoutMs = 8000) {
+  if (!browser) return;
+
+  let timedOut = false;
+  const closePromise = browser.close().catch(() => {});
+  await Promise.race([
+    closePromise,
+    delay(timeoutMs).then(() => {
+      timedOut = true;
+    }),
+  ]);
+
+  if (!timedOut) return;
+
+  const proc = browser.process?.();
+  if (proc && !proc.killed) {
+    try {
+      proc.kill('SIGKILL');
+    } catch {
+      // ignore
+    }
+  }
+
+  // Ensure the pending close promise settles so Node can exit cleanly.
+  await Promise.race([closePromise, delay(2000)]);
+}
+
 async function verifySelectedRoom(page, unit, label) {
   const state = await page.evaluate((selectedUnit) => ({
     selected: window.__roomKmlOverlay.getSelectedRoom(),
@@ -327,12 +358,8 @@ async function run() {
 
     console.log(JSON.stringify({ url, initial, editor, checks, invalid, seriousErrors }, null, 2));
   } finally {
-    if (!browser) return;
-    await Promise.race([
-      browser.close(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('verify-room-overlay: browser.close timeout')), 10000)),
-    ]);
     clearTimeout(watchdog);
+    await safeCloseBrowser(browser);
   }
 }
 
