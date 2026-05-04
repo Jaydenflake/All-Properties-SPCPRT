@@ -1,7 +1,13 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { createServer } from 'node:http';
-const root = resolve(process.cwd());
+function parseRootArg(argv) {
+  const idx = argv.indexOf('--root');
+  if (idx === -1) return null;
+  return argv[idx + 1] || null;
+}
+
+const root = resolve(parseRootArg(process.argv) || process.cwd());
 const host = process.env.SERVER_HOST || '127.0.0.1';
 const initialPort = Number.parseInt(process.env.SERVER_PORT || '4173', 10);
 const maxPort = Number.parseInt(process.env.SERVER_PORT_MAX || String(initialPort + 20), 10);
@@ -70,14 +76,15 @@ async function listenWithFallback() {
   for (let port = initialPort; port <= maxPort; port += 1) {
     const server = createAppServer();
     const result = await new Promise((resolvePromise) => {
-      server.once('error', (error) => resolvePromise({ ok: false, error }));
-      server.once('listening', () => resolvePromise({ ok: true, port }));
+      server.once('error', (error) => resolvePromise({ ok: false, error, server }));
+      server.once('listening', () => resolvePromise({ ok: true, port, server }));
       server.listen(port, host);
     });
 
     if (result.ok) {
       console.log(`Canyon Vista server running at http://${host}:${result.port}`);
-      return;
+      process.on('SIGINT', () => result.server.close(() => process.exit(0)));
+      await new Promise(() => {});
     }
 
     if (result.error && result.error.code === 'EADDRINUSE') {

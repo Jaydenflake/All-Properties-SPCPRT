@@ -1,0 +1,994 @@
+/**
+ * Canyon Vista room KML overlay.
+ *
+ * Loads the generated pixel-coordinate KML, maps it into the viewer's XZ scene
+ * bounds, renders selectable room outlines, and exposes a small runtime API for
+ * room-number lookup.
+ */
+import {
+  BoxGeometry,
+  DoubleSide,
+  Group,
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
+  Plane,
+  Raycaster,
+  Shape,
+  ShapeGeometry,
+  SphereGeometry,
+  Vector2,
+  Vector3,
+} from 'three';
+
+const KML_PIXEL_SCALE = 10000;
+const DEFAULT_KML_URL = 'exports/canyon-vista-units.kml';
+const DEFAULT_SCENE_Y = -0.052;
+const LINE_THICKNESS = 0.012;
+const LINE_HEIGHT = 0.004;
+const NORMAL_LINE_COLOR = 0xf2f2f2;
+const SELECTED_LINE_COLOR = 0xffd047;
+const NORMAL_FILL_COLOR = 0xff6b35;
+const SELECTED_FILL_COLOR = 0xffd047;
+const DEFAULT_FLOOR_ROTATION_DEG = 0;
+const DEFAULT_FLOOR_FLIP_X = true;
+const VERTEX_HANDLE_COLOR = 0x36d6ff;
+const SELECTED_VERTEX_HANDLE_COLOR = 0xffd047;
+const VERTEX_HANDLE_RADIUS = 0.026;
+
+function round6(n) {
+  return Math.round(n * 1e6) / 1e6;
+}
+
+function placemarkChildren(doc) {
+  const byTag = Array.from(doc.getElementsByTagName('Placemark'));
+  if (byTag.length) return byTag;
+  return Array.from(doc.getElementsByTagNameNS('*', 'Placemark'));
+}
+
+function firstTextByTag(root, tag) {
+  const direct = root.getElementsByTagName(tag)[0] || root.getElementsByTagNameNS('*', tag)[0];
+  return direct ? String(direct.textContent || '').trim() : '';
+}
+
+export function parseKmlUnits(kmlText) {
+  const doc = new DOMParser().parseFromString(kmlText, 'application/xml');
+  const parserError = doc.getElementsByTagName('parsererror')[0];
+  if (parserError) throw new Error('Invalid KML XML');
+
+  return placemarkChildren(doc)
+    .map((placemark) => {
+      const name = firstTextByTag(placemark, 'name');
+      const match = name.match(/(\d+)/);
+      const unit = match ? Number.parseInt(match[1], 10) : NaN;
+      const coordText = firstTextByTag(placemark, 'coordinates');
+      const points = coordText
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((item) => {
+          const [lon, lat] = item.split(',').map((part) => Number.parseFloat(part));
+          return [round6(lon * KML_PIXEL_SCALE), round6(-lat * KML_PIXEL_SCALE)];
+        });
+      if (points.length > 1) {
+        const first = points[0];
+        const last = points[points.length - 1];
+        if (first[0] === last[0] && first[1] === last[1]) points.pop();
+      }
+      return { unit, name, corners_px: points };
+    })
+    .filter((entry) => Number.isFinite(entry.unit) && entry.corners_px.length >= 4)
+    .sort((a, b) => a.unit - b.unit);
+}
+
+function getImageBounds(units) {
+  const xs = [];
+  const ys = [];
+  units.forEach((unit) => {
+    unit.corners_px.forEach(([x, y]) => {
+      xs.push(x);
+      ys.push(y);
+    });
+  });
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+  };
+}
+
+function getSceneBounds(borderDotPositions = []) {
+  const positions = borderDotPositions
+    .map((entry) => entry?.position)
+    .filter((position) => Number.isFinite(position?.x) && Number.isFinite(position?.z));
+  if (!positions.length) {
+    return { minX: -1.9, maxX: 0.65, minZ: -1.55, maxZ: 0.95 };
+  }
+  return {
+    minX: Math.min(...positions.map((p) => p.x)),
+    maxX: Math.max(...positions.map((p) => p.x)),
+    minZ: Math.min(...positions.map((p) => p.z)),
+    maxZ: Math.max(...positions.map((p) => p.z)),
+  };
+}
+
+export function createImageToSceneMapper(units, borderDotPositions = []) {
+  const image = getImageBounds(units);
+  const scene = getSceneBounds(borderDotPositions);
+  const width = Math.max(1, image.maxX - image.minX);
+  const height = Math.max(1, image.maxY - image.minY);
+  return {
+    image,
+    scene,
+    mapPoint([x, y]) {
+      const tx = (x - image.minX) / width;
+      const ty = (y - image.minY) / height;
+      return [
+        round6(scene.minX + tx * (scene.maxX - scene.minX)),
+        round6(scene.maxZ - ty * (scene.maxZ - scene.minZ)),
+      ];
+    },
+  };
+}
+
+function polygonCenter(points) {
+  return points.reduce(
+    (acc, point) => {
+      acc[0] += point[0] / points.length;
+      acc[1] += point[1] / points.length;
+      return acc;
+    },
+    [0, 0]
+  );
+}
+
+function clonePoint(point) {
+  return [round6(point[0]), round6(point[1])];
+}
+
+function makeFillMesh(points, y, material) {
+  const shape = new Shape();
+  shape.moveTo(points[0][0], -points[0][1]);
+  for (let i = 1; i < points.length; i += 1) shape.lineTo(points[i][0], -points[i][1]);
+  shape.closePath();
+  const geometry = new ShapeGeometry(shape);
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, y, 0);
+  const mesh = new Mesh(geometry, material);
+  mesh.renderOrder = 1003;
+  mesh.userData.isRoomFill = true;
+  return mesh;
+}
+
+function makeEdgeMesh(startPoint, endPoint, y, material) {
+  const start = new Vector3(startPoint[0], y, startPoint[1]);
+  const end = new Vector3(endPoint[0], y, endPoint[1]);
+  const direction = new Vector3().subVectors(end, start);
+  const length = direction.length();
+  const midPoint = new Vector3().addVectors(start, end).multiplyScalar(0.5);
+  const geometry = new BoxGeometry(length, LINE_HEIGHT, LINE_THICKNESS);
+  const mesh = new Mesh(geometry, material);
+
+  const xAxis = direction.clone().normalize();
+  let up = new Vector3(0, 1, 0);
+  if (Math.abs(xAxis.dot(up)) > 0.9999) up = new Vector3(0, 0, 1);
+  const zAxis = new Vector3().crossVectors(xAxis, up).normalize();
+  const yAxis = new Vector3().crossVectors(zAxis, xAxis).normalize();
+  const rotation = new Matrix4().makeBasis(xAxis, yAxis, zAxis);
+  const translation = new Matrix4().makeTranslation(midPoint.x, midPoint.y, midPoint.z);
+
+  mesh.matrixAutoUpdate = false;
+  mesh.matrix.multiplyMatrices(translation, rotation);
+  mesh.renderOrder = 1004;
+  mesh.userData.isRoomEdge = true;
+  return mesh;
+}
+
+function applyRoomVisual(room, selected) {
+  room.fillMaterial.color.setHex(selected ? SELECTED_FILL_COLOR : NORMAL_FILL_COLOR);
+  room.fillMaterial.opacity = selected ? 0.34 : 0.055;
+  room.lineMaterial.color.setHex(selected ? SELECTED_LINE_COLOR : NORMAL_LINE_COLOR);
+  room.lineMaterial.opacity = selected ? 1 : 0.58;
+  room.group.renderOrder = selected ? 1007 : 1002;
+}
+
+function buildRoom(unitData, transform, sceneY) {
+  const cornersXz = unitData.corners_px.map((point) => transform.mapPoint(point));
+  const [cx, cz] = polygonCenter(cornersXz);
+  const group = new Group();
+  group.name = `room-${unitData.unit}`;
+  group.userData.isRoomKmlGroup = true;
+  group.userData.roomUnit = unitData.unit;
+
+  const fillMaterial = new MeshBasicMaterial({
+    color: NORMAL_FILL_COLOR,
+    transparent: true,
+    opacity: 0.055,
+    depthTest: false,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const lineMaterial = new MeshBasicMaterial({
+    color: NORMAL_LINE_COLOR,
+    transparent: true,
+    opacity: 0.58,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const fillMesh = makeFillMesh(cornersXz, sceneY, fillMaterial);
+  fillMesh.userData.roomUnit = unitData.unit;
+  group.add(fillMesh);
+
+  cornersXz.forEach((point, idx) => {
+    const next = cornersXz[(idx + 1) % cornersXz.length];
+    const edge = makeEdgeMesh(point, next, sceneY + 0.004, lineMaterial);
+    edge.userData.roomUnit = unitData.unit;
+    group.add(edge);
+  });
+
+  return {
+    unit: unitData.unit,
+    sourceName: unitData.name,
+    cornersPx: unitData.corners_px,
+    cornersXz,
+    center: new Vector3(cx, sceneY, cz),
+    group,
+    fillMaterial,
+    lineMaterial,
+  };
+}
+
+function rebuildRoomGeometry(room, sceneY) {
+  room.group.children.forEach((child) => child.geometry?.dispose?.());
+  room.group.clear();
+  const [cx, cz] = polygonCenter(room.cornersXz);
+  room.center.set(cx, sceneY, cz);
+  const fillMesh = makeFillMesh(room.cornersXz, sceneY, room.fillMaterial);
+  fillMesh.userData.roomUnit = room.unit;
+  groupRenderData(fillMesh, room.unit);
+  room.group.add(fillMesh);
+  room.cornersXz.forEach((point, idx) => {
+    const next = room.cornersXz[(idx + 1) % room.cornersXz.length];
+    const edge = makeEdgeMesh(point, next, sceneY + 0.004, room.lineMaterial);
+    edge.userData.roomUnit = room.unit;
+    groupRenderData(edge, room.unit);
+    room.group.add(edge);
+  });
+}
+
+function groupRenderData(mesh, unit) {
+  mesh.userData.roomUnit = unit;
+}
+
+function makeVertexHandleMesh(unit, vertexIndex, point, sceneY, selected) {
+  const geometry = new SphereGeometry(VERTEX_HANDLE_RADIUS, 18, 10);
+  const material = new MeshBasicMaterial({
+    color: selected ? SELECTED_VERTEX_HANDLE_COLOR : VERTEX_HANDLE_COLOR,
+    transparent: true,
+    opacity: 0.96,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const mesh = new Mesh(geometry, material);
+  mesh.position.set(point[0], sceneY + 0.038, point[1]);
+  mesh.scale.setScalar(selected ? 1.45 : 1.08);
+  mesh.renderOrder = 1012;
+  mesh.userData.isVertexHandle = true;
+  mesh.userData.roomUnit = unit;
+  mesh.userData.vertexIndex = vertexIndex;
+  return mesh;
+}
+
+function roomFootprintSize(room) {
+  const xs = room.cornersXz.map((point) => point[0]);
+  const zs = room.cornersXz.map((point) => point[1]);
+  return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
+}
+
+export function initRoomKmlOverlay({
+  scene,
+  camera,
+  controls,
+  renderer,
+  kmlUrl = DEFAULT_KML_URL,
+  borderDotPositions = [],
+  sceneY = DEFAULT_SCENE_Y,
+  pauseCameraAutomation = null,
+  elements = {},
+} = {}) {
+  const state = {
+    rooms: new Map(),
+    selectedRoom: null,
+    selectedVertexIndex: 0,
+    editorOpen: false,
+    editorMode: 'plan',
+    floorBaseCenter: { x: 0, z: 0 },
+    floorTransform: {
+      centerX: 0,
+      centerZ: 0,
+      rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
+      scale: 1,
+      flipX: DEFAULT_FLOOR_FLIP_X,
+    },
+    group: new Group(),
+    vertexHandleGroup: new Group(),
+    vertexHandles: [],
+    drag: null,
+    floorDragPlane: new Plane(new Vector3(0, 1, 0), -sceneY),
+    floorDragPoint: new Vector3(),
+    groupInverseMatrix: new Matrix4(),
+    raycaster: new Raycaster(),
+    ndc: new Vector2(),
+    ready: null,
+  };
+  state.group.name = 'room-kml-overlay';
+  state.vertexHandleGroup.name = 'room-kml-vertex-handles';
+  state.group.matrixAutoUpdate = false;
+  state.group.add(state.vertexHandleGroup);
+  scene.add(state.group);
+
+  const input = elements.input || null;
+  const statusEl = elements.statusEl || null;
+  const clearButton = elements.clearButton || null;
+  const panel = elements.panel || null;
+  const editorToggle = elements.editorToggle || null;
+  const editorPanel = elements.editorPanel || null;
+  const planTab = elements.planTab || null;
+  const vertexTab = elements.vertexTab || null;
+  const planPane = elements.planPane || null;
+  const vertexPane = elements.vertexPane || null;
+  const centerXInput = elements.centerX || null;
+  const centerZInput = elements.centerZ || null;
+  const rotationInput = elements.rotation || null;
+  const scaleInput = elements.scale || null;
+  const flipXInput = elements.flipX || null;
+  const resetTransformButton = elements.resetTransformButton || null;
+  const editorSelectedEl = elements.editorSelectedEl || null;
+  const vertexSelect = elements.vertexSelect || null;
+  const vertexXInput = elements.vertexX || null;
+  const vertexZInput = elements.vertexZ || null;
+  const applyVertexButton = elements.applyVertexButton || null;
+
+  function setStatus(text) {
+    if (statusEl) statusEl.textContent = text;
+  }
+
+  function formatNumber(value) {
+    return Number.isFinite(value) ? String(round6(value)) : '';
+  }
+
+  function displayedPoint([x, z], y = sceneY) {
+    state.group.updateMatrixWorld(true);
+    return new Vector3(x, y, z).applyMatrix4(state.group.matrixWorld);
+  }
+
+  function displayedCenter(room) {
+    return displayedPoint([room.center.x, room.center.z], room.center.y);
+  }
+
+  function setPointerNdc(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    state.ndc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    state.ndc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  function capturePointer(pointerId) {
+    try {
+      renderer.domElement.setPointerCapture?.(pointerId);
+    } catch {
+      // Verification can use synthetic pointer ids that are not active browser pointers.
+    }
+  }
+
+  function releasePointer(pointerId) {
+    try {
+      renderer.domElement.releasePointerCapture?.(pointerId);
+    } catch {
+      // Matching capture can fail for synthetic verification pointers.
+    }
+  }
+
+  function applyFloorTransform() {
+    const { centerX, centerZ, rotationDeg, scale, flipX } = state.floorTransform;
+    const moveToOrigin = new Matrix4().makeTranslation(-state.floorBaseCenter.x, 0, -state.floorBaseCenter.z);
+    const scaleMatrix = new Matrix4().makeScale(scale * (flipX ? -1 : 1), 1, scale);
+    const rotationMatrix = new Matrix4().makeRotationY((rotationDeg * Math.PI) / 180);
+    const moveToCenter = new Matrix4().makeTranslation(centerX, 0, centerZ);
+    state.group.matrix.identity();
+    state.group.matrix.multiply(moveToCenter).multiply(rotationMatrix).multiply(scaleMatrix).multiply(moveToOrigin);
+    state.group.updateMatrixWorld(true);
+  }
+
+  function clearVertexHandles() {
+    state.vertexHandles.forEach((handle) => {
+      handle.geometry?.dispose?.();
+      handle.material?.dispose?.();
+    });
+    state.vertexHandleGroup.clear();
+    state.vertexHandles = [];
+  }
+
+  function syncVertexHandles() {
+    clearVertexHandles();
+    const room = state.selectedRoom;
+    if (state.editorMode !== 'vertex' || !room) return;
+    room.cornersXz.forEach((point, idx) => {
+      const handle = makeVertexHandleMesh(room.unit, idx, point, sceneY, idx === state.selectedVertexIndex);
+      state.vertexHandles.push(handle);
+      state.vertexHandleGroup.add(handle);
+    });
+  }
+
+  function syncPlanInputs() {
+    if (centerXInput) centerXInput.value = formatNumber(state.floorTransform.centerX);
+    if (centerZInput) centerZInput.value = formatNumber(state.floorTransform.centerZ);
+    if (rotationInput) rotationInput.value = formatNumber(state.floorTransform.rotationDeg);
+    if (scaleInput) scaleInput.value = formatNumber(state.floorTransform.scale);
+    if (flipXInput) flipXInput.checked = !!state.floorTransform.flipX;
+  }
+
+  function setFloorTransform(next = {}) {
+    const centerX = Number.parseFloat(next.centerX);
+    const centerZ = Number.parseFloat(next.centerZ);
+    const rotationDeg = Number.parseFloat(next.rotationDeg);
+    const scale = Number.parseFloat(next.scale);
+    if (Number.isFinite(centerX)) state.floorTransform.centerX = round6(centerX);
+    if (Number.isFinite(centerZ)) state.floorTransform.centerZ = round6(centerZ);
+    if (Number.isFinite(rotationDeg)) state.floorTransform.rotationDeg = round6(rotationDeg);
+    if (Number.isFinite(scale)) state.floorTransform.scale = round6(Math.max(0.05, Math.min(20, scale)));
+    if (typeof next.flipX === 'boolean') {
+      state.floorTransform.flipX = next.flipX;
+    } else if (typeof next.flipX === 'string') {
+      state.floorTransform.flipX = ['1', 'true', 'on', 'yes'].includes(next.flipX.toLowerCase());
+    }
+    applyFloorTransform();
+    syncPlanInputs();
+    return getFloorTransform();
+  }
+
+  function getFloorTransform() {
+    return { ...state.floorTransform };
+  }
+
+  function resetFloorTransform() {
+    state.floorTransform = {
+      centerX: state.floorBaseCenter.x,
+      centerZ: state.floorBaseCenter.z,
+      rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
+      scale: 1,
+      flipX: DEFAULT_FLOOR_FLIP_X,
+    };
+    applyFloorTransform();
+    syncPlanInputs();
+    return getFloorTransform();
+  }
+
+  function setEditorOpen(open) {
+    state.editorOpen = !!open;
+    if (editorPanel) editorPanel.classList.toggle('active', state.editorOpen);
+    if (editorToggle) {
+      editorToggle.classList.toggle('active', state.editorOpen);
+      editorToggle.setAttribute('aria-pressed', state.editorOpen ? 'true' : 'false');
+    }
+  }
+
+  function setEditorMode(mode) {
+    state.editorMode = mode === 'vertex' ? 'vertex' : 'plan';
+    if (planTab) planTab.classList.toggle('active', state.editorMode === 'plan');
+    if (vertexTab) vertexTab.classList.toggle('active', state.editorMode === 'vertex');
+    if (planPane) planPane.classList.toggle('active', state.editorMode === 'plan');
+    if (vertexPane) vertexPane.classList.toggle('active', state.editorMode === 'vertex');
+    syncVertexHandles();
+    if (state.editorMode === 'vertex' && state.selectedRoom) focusRoomTopDown(state.selectedRoom);
+  }
+
+  function syncVertexInputs() {
+    const room = state.selectedRoom;
+    if (editorSelectedEl) editorSelectedEl.textContent = room ? `Unit ${room.unit}` : 'Select a room';
+    if (vertexSelect) {
+      vertexSelect.innerHTML = '';
+      if (room) {
+        room.cornersXz.forEach((_, idx) => {
+          const option = document.createElement('option');
+          option.value = String(idx);
+          option.textContent = `Vertex ${idx + 1}`;
+          vertexSelect.appendChild(option);
+        });
+        state.selectedVertexIndex = Math.min(state.selectedVertexIndex, room.cornersXz.length - 1);
+        vertexSelect.value = String(state.selectedVertexIndex);
+      }
+    }
+    const vertex = room ? room.cornersXz[state.selectedVertexIndex] : null;
+    if (vertexXInput) vertexXInput.value = vertex ? formatNumber(vertex[0]) : '';
+    if (vertexZInput) vertexZInput.value = vertex ? formatNumber(vertex[1]) : '';
+    syncVertexHandles();
+  }
+
+  function getRoomVertex(unit, vertexIndex = 0) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    const idx = Number.parseInt(String(vertexIndex), 10);
+    if (!room || !Number.isFinite(idx) || !room.cornersXz[idx]) return null;
+    return clonePoint(room.cornersXz[idx]);
+  }
+
+  function updateRoomVertex(unit, vertexIndex, point = {}) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    const idx = Number.parseInt(String(vertexIndex), 10);
+    const x = Number.parseFloat(point.x);
+    const z = Number.parseFloat(point.z);
+    if (!room || !Number.isFinite(idx) || !room.cornersXz[idx] || !Number.isFinite(x) || !Number.isFinite(z)) return null;
+    room.cornersXz[idx] = [round6(x), round6(z)];
+    rebuildRoomGeometry(room, sceneY);
+    applyRoomVisual(room, state.selectedRoom === room);
+    syncVertexInputs();
+    return getRoomVertex(unit, idx);
+  }
+
+  function focusRoom(room) {
+    if (!room || !controls || !camera) return;
+    const center = displayedCenter(room);
+    const focusDistance = Math.min(1.35, Math.max(0.72, roomFootprintSize(room) * state.floorTransform.scale * 4.8));
+    controls.target.set(center.x, center.y, center.z);
+    camera.position.set(
+      center.x + focusDistance * 0.22,
+      sceneY + focusDistance * 1.16,
+      center.z + focusDistance * 0.38
+    );
+    controls.update();
+  }
+
+  function focusRoomTopDown(room) {
+    if (!room || !controls || !camera) return;
+    const center = displayedCenter(room);
+    const focusDistance = Math.min(2.2, Math.max(1.05, roomFootprintSize(room) * state.floorTransform.scale * 7.2));
+    controls.target.set(center.x, center.y, center.z);
+    camera.position.set(center.x + 0.002, sceneY + focusDistance, center.z + 0.002);
+    controls.update();
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    const desiredX = rect.width < 720 ? 0.82 : 0.58;
+    const desiredNdc = new Vector2(desiredX * 2 - 1, -(0.55 * 2 - 1));
+    state.raycaster.setFromCamera(desiredNdc, camera);
+    if (state.raycaster.ray.intersectPlane(state.floorDragPlane, state.floorDragPoint)) {
+      const offset = new Vector3().subVectors(center, state.floorDragPoint);
+      controls.target.add(offset);
+      camera.position.add(offset);
+      controls.update();
+    }
+  }
+
+  function setSelectedRoom(room, { syncInput = true, focus = true } = {}) {
+    if (state.selectedRoom) applyRoomVisual(state.selectedRoom, false);
+    state.selectedRoom = room || null;
+    if (state.selectedRoom) {
+      applyRoomVisual(state.selectedRoom, true);
+      if (typeof pauseCameraAutomation === 'function') pauseCameraAutomation();
+      if (syncInput && input) input.value = String(state.selectedRoom.unit);
+      setStatus(`Room ${state.selectedRoom.unit}`);
+      document.documentElement.dataset.selectedRoom = String(state.selectedRoom.unit);
+      syncVertexInputs();
+      if (focus && controls) {
+        if (state.editorMode === 'vertex') focusRoomTopDown(state.selectedRoom);
+        else focusRoom(state.selectedRoom);
+      }
+    } else {
+      if (syncInput && input) input.value = '';
+      setStatus(`Loaded ${state.rooms.size} rooms`);
+      delete document.documentElement.dataset.selectedRoom;
+      syncVertexInputs();
+    }
+  }
+
+  function selectRoom(value, options = {}) {
+    const unit = Number.parseInt(String(value || '').trim(), 10);
+    if (!Number.isFinite(unit)) {
+      setSelectedRoom(null, options);
+      return false;
+    }
+    const room = state.rooms.get(unit) || null;
+    if (!room) {
+      if (state.selectedRoom) applyRoomVisual(state.selectedRoom, false);
+      state.selectedRoom = null;
+      setStatus(`Room ${unit} not found`);
+      delete document.documentElement.dataset.selectedRoom;
+      return false;
+    }
+    setSelectedRoom(room, options);
+    return true;
+  }
+
+  function getRoomObjects() {
+    const objects = [];
+    state.rooms.forEach((room) => {
+      room.group.traverse((child) => {
+        if (child.isMesh) objects.push(child);
+      });
+    });
+    return objects;
+  }
+
+  function pickVertexHandle(event) {
+    if (state.editorMode !== 'vertex' || !state.selectedRoom || !state.vertexHandles.length) return null;
+    setPointerNdc(event);
+    state.raycaster.setFromCamera(state.ndc, camera);
+    const hits = state.raycaster.intersectObjects(state.vertexHandles, false);
+    return hits[0]?.object || null;
+  }
+
+  function beginVertexDrag(event) {
+    const handle = pickVertexHandle(event);
+    if (!handle) return false;
+    const room = state.rooms.get(handle.userData.roomUnit);
+    const vertexIndex = handle.userData.vertexIndex;
+    if (!room || !Number.isFinite(vertexIndex)) return false;
+    if (typeof pauseCameraAutomation === 'function') pauseCameraAutomation();
+    state.selectedVertexIndex = vertexIndex;
+    syncVertexInputs();
+    state.drag = {
+      room,
+      vertexIndex,
+      pointerId: event.pointerId,
+      previousControlsEnabled: controls ? controls.enabled : undefined,
+    };
+    if (controls) controls.enabled = false;
+    capturePointer(event.pointerId);
+    renderer.domElement.style.cursor = 'grabbing';
+    setStatus(`Dragging vertex ${vertexIndex + 1}`);
+    return true;
+  }
+
+  function moveVertexDrag(event) {
+    if (!state.drag) return false;
+    setPointerNdc(event);
+    state.raycaster.setFromCamera(state.ndc, camera);
+    if (!state.raycaster.ray.intersectPlane(state.floorDragPlane, state.floorDragPoint)) return false;
+    state.group.updateMatrixWorld(true);
+    state.groupInverseMatrix.copy(state.group.matrixWorld).invert();
+    const localPoint = state.floorDragPoint.clone().applyMatrix4(state.groupInverseMatrix);
+    const updated = updateRoomVertex(state.drag.room.unit, state.drag.vertexIndex, {
+      x: localPoint.x,
+      z: localPoint.z,
+    });
+    return !!updated;
+  }
+
+  function endVertexDrag(event = {}) {
+    if (!state.drag) return false;
+    if (controls && typeof state.drag.previousControlsEnabled === 'boolean') {
+      controls.enabled = state.drag.previousControlsEnabled;
+    }
+    if (Number.isFinite(event.pointerId)) releasePointer(event.pointerId);
+    state.drag = null;
+    renderer.domElement.style.cursor = '';
+    if (state.selectedRoom) setStatus(`Room ${state.selectedRoom.unit}`);
+    return true;
+  }
+
+  function pointerEventForScreenPoint(point) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    return {
+      clientX: rect.left + point.x,
+      clientY: rect.top + point.y,
+      pointerId: 1,
+    };
+  }
+
+  function beginVertexDragForVerification(unit, vertexIndex = 0) {
+    if (!selectRoom(unit, { syncInput: true, focus: true })) return false;
+    setEditorOpen(true);
+    setEditorMode('vertex');
+    state.selectedVertexIndex = Number.parseInt(String(vertexIndex), 10) || 0;
+    syncVertexInputs();
+    const handle = getVertexHandleScreenState(unit, state.selectedVertexIndex);
+    if (!handle?.visible) return false;
+    return beginVertexDrag(pointerEventForScreenPoint(handle.screen));
+  }
+
+  function moveVertexDragForVerification(deltaX = 0, deltaY = 0) {
+    if (!state.drag) return null;
+    const handle = getVertexHandleScreenState(state.drag.room.unit, state.drag.vertexIndex);
+    if (!handle?.visible) return null;
+    const moved = moveVertexDrag(pointerEventForScreenPoint({
+      x: handle.screen.x + deltaX,
+      y: handle.screen.y + deltaY,
+    }));
+    if (!moved) return null;
+    return getRoomVertex(state.drag.room.unit, state.drag.vertexIndex);
+  }
+
+  function endVertexDragForVerification() {
+    return endVertexDrag({ pointerId: state.drag?.pointerId });
+  }
+
+  function selectFromPointer(event) {
+    if (!state.rooms.size) return false;
+    setPointerNdc(event);
+    state.raycaster.setFromCamera(state.ndc, camera);
+    const hits = state.raycaster.intersectObjects(getRoomObjects(), false);
+    if (!hits.length) return false;
+    const unit = hits[0].object.userData.roomUnit;
+    return selectRoom(unit, { syncInput: true, focus: false });
+  }
+
+  function getVertexHandleScreenState(unit, vertexIndex = 0) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    const idx = Number.parseInt(String(vertexIndex), 10);
+    if (!room || !room.cornersXz[idx] || !camera || !renderer?.domElement) return null;
+    camera.updateProjectionMatrix?.();
+    camera.updateMatrixWorld?.(true);
+    state.group.updateMatrixWorld(true);
+    const rect = renderer.domElement.getBoundingClientRect();
+    const world = displayedPoint(room.cornersXz[idx], sceneY + 0.038);
+    const projected = world.clone().project(camera);
+    const screen = {
+      x: round6((projected.x + 1) * 0.5 * rect.width),
+      y: round6((1 - projected.y) * 0.5 * rect.height),
+      z: round6(projected.z),
+    };
+    return {
+      unit: room.unit,
+      vertexIndex: idx,
+      visible: projected.z > -1 && projected.z < 1 && screen.x >= 0 && screen.x <= rect.width && screen.y >= 0 && screen.y <= rect.height,
+      screen,
+      viewport: {
+        x: round6(rect.left + screen.x),
+        y: round6(rect.top + screen.y),
+      },
+      vertex: clonePoint(room.cornersXz[idx]),
+    };
+  }
+
+  function getRoomScreenState(unit) {
+    const room = state.rooms.get(Number.parseInt(String(unit), 10));
+    if (!room || !camera || !renderer?.domElement) return null;
+    camera.updateProjectionMatrix?.();
+    camera.updateMatrixWorld?.(true);
+    const rect = renderer.domElement.getBoundingClientRect();
+    const projected = room.cornersXz.map((corner) => {
+      const point = displayedPoint(corner, sceneY + 0.025).project(camera);
+      return {
+        x: round6((point.x + 1) * 0.5 * rect.width),
+        y: round6((1 - point.y) * 0.5 * rect.height),
+        z: round6(point.z),
+        inDepth: point.z > -1 && point.z < 1,
+      };
+    });
+    const visiblePoints = projected.filter((point) => point.inDepth);
+    const xs = visiblePoints.map((point) => point.x);
+    const ys = visiblePoints.map((point) => point.y);
+    const minX = xs.length ? Math.min(...xs) : null;
+    const maxX = xs.length ? Math.max(...xs) : null;
+    const minY = ys.length ? Math.min(...ys) : null;
+    const maxY = ys.length ? Math.max(...ys) : null;
+    const intersectsViewport = xs.length > 0 && maxX >= 0 && minX <= rect.width && maxY >= 0 && minY <= rect.height;
+    return {
+      selected: state.selectedRoom === room,
+      visiblePointCount: visiblePoints.length,
+      intersectsViewport,
+      bounds: xs.length
+        ? {
+            minX: round6(minX),
+            maxX: round6(maxX),
+            minY: round6(minY),
+            maxY: round6(maxY),
+            width: round6(maxX - minX),
+            height: round6(maxY - minY),
+          }
+        : null,
+    };
+  }
+
+  function orbitSelectedRoomForVerification({ azimuth = 0, elevationRatio = 0.7, distanceScale = 1 } = {}) {
+    const room = state.selectedRoom;
+    if (!room || !camera || !controls) return null;
+    const currentDistance = Math.max(0.58, camera.position.distanceTo(controls.target) * distanceScale);
+    const clampedElevation = Math.min(1.1, Math.max(0.35, Number(elevationRatio) || 0.7));
+    const horizontalDistance = Math.max(0.28, currentDistance * Math.sqrt(Math.max(0.08, 1 - clampedElevation * clampedElevation)));
+    const center = displayedCenter(room);
+    controls.target.set(center.x, center.y, center.z);
+    camera.position.set(
+      center.x + Math.cos(azimuth) * horizontalDistance,
+      sceneY + currentDistance * clampedElevation,
+      center.z + Math.sin(azimuth) * horizontalDistance
+    );
+    controls.update();
+    return getRoomScreenState(room.unit);
+  }
+
+  function handlePointerDown(event) {
+    if (beginVertexDrag(event) || selectFromPointer(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  function handlePointerMove(event) {
+    if (!moveVertexDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handlePointerUp(event) {
+    if (!endVertexDrag(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (panel) {
+    ['pointerdown', 'click', 'touchstart'].forEach((eventName) => {
+      panel.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
+    });
+  }
+  if (editorPanel) {
+    ['pointerdown', 'click', 'touchstart'].forEach((eventName) => {
+      editorPanel.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
+    });
+  }
+
+  if (editorToggle) {
+    editorToggle.addEventListener('click', () => setEditorOpen(!state.editorOpen));
+  }
+  if (planTab) planTab.addEventListener('click', () => setEditorMode('plan'));
+  if (vertexTab) vertexTab.addEventListener('click', () => setEditorMode('vertex'));
+
+  function applyPlanInputs() {
+    setFloorTransform({
+      centerX: centerXInput?.value,
+      centerZ: centerZInput?.value,
+      rotationDeg: rotationInput?.value,
+      scale: scaleInput?.value,
+      flipX: flipXInput?.checked,
+    });
+  }
+
+  [centerXInput, centerZInput, rotationInput, scaleInput].forEach((field) => {
+    if (!field) return;
+    field.addEventListener('input', applyPlanInputs);
+    field.addEventListener('change', applyPlanInputs);
+  });
+  if (flipXInput) {
+    flipXInput.addEventListener('change', applyPlanInputs);
+  }
+  if (resetTransformButton) resetTransformButton.addEventListener('click', resetFloorTransform);
+
+  if (vertexSelect) {
+    vertexSelect.addEventListener('change', () => {
+      state.selectedVertexIndex = Number.parseInt(vertexSelect.value, 10) || 0;
+      syncVertexInputs();
+    });
+  }
+
+  function applyVertexInputs() {
+    if (!state.selectedRoom) return;
+    updateRoomVertex(state.selectedRoom.unit, state.selectedVertexIndex, {
+      x: vertexXInput?.value,
+      z: vertexZInput?.value,
+    });
+  }
+
+  [vertexXInput, vertexZInput].forEach((field) => {
+    if (!field) return;
+    field.addEventListener('input', applyVertexInputs);
+    field.addEventListener('change', applyVertexInputs);
+  });
+  if (applyVertexButton) applyVertexButton.addEventListener('click', applyVertexInputs);
+
+  if (input) {
+    input.addEventListener('input', () => {
+      const value = input.value.trim();
+      if (!value) setSelectedRoom(null);
+      else selectRoom(value, { syncInput: false, focus: true });
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      selectRoom(input.value, { syncInput: true, focus: true });
+    });
+  }
+  if (clearButton) {
+    clearButton.addEventListener('click', () => setSelectedRoom(null, { syncInput: true, focus: false }));
+  }
+  renderer.domElement.addEventListener('pointerdown', handlePointerDown, { passive: false, capture: true });
+  renderer.domElement.addEventListener('pointermove', handlePointerMove, { passive: false, capture: true });
+  renderer.domElement.addEventListener('pointerup', handlePointerUp, { passive: false, capture: true });
+  renderer.domElement.addEventListener('pointercancel', handlePointerUp, { passive: false, capture: true });
+
+  async function load() {
+    setStatus('Loading rooms');
+    const res = await fetch(kmlUrl, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`KML ${res.status}`);
+    const units = parseKmlUnits(await res.text());
+    const transform = createImageToSceneMapper(units, borderDotPositions);
+    units.forEach((unit) => {
+      const room = buildRoom(unit, transform, sceneY);
+      state.rooms.set(room.unit, room);
+      state.group.add(room.group);
+    });
+    state.floorBaseCenter = {
+      x: round6((transform.scene.minX + transform.scene.maxX) / 2),
+      z: round6((transform.scene.minZ + transform.scene.maxZ) / 2),
+    };
+    state.floorTransform = {
+      centerX: state.floorBaseCenter.x,
+      centerZ: state.floorBaseCenter.z,
+      rotationDeg: DEFAULT_FLOOR_ROTATION_DEG,
+      scale: 1,
+      flipX: DEFAULT_FLOOR_FLIP_X,
+    };
+    applyFloorTransform();
+    syncPlanInputs();
+    setEditorMode('plan');
+    syncVertexInputs();
+    document.documentElement.dataset.roomOverlayReady = 'true';
+    setStatus(`Loaded ${state.rooms.size} rooms`);
+    return state.rooms.size;
+  }
+
+  state.ready = load().catch((error) => {
+    console.warn('room-kml-overlay failed to load', error);
+    setStatus('Rooms unavailable');
+    throw error;
+  });
+
+  const api = {
+    ready: state.ready,
+    selectRoom,
+    getSelectedRoom() {
+      return state.selectedRoom ? state.selectedRoom.unit : null;
+    },
+    roomCount() {
+      return state.rooms.size;
+    },
+    getRoomUnits() {
+      return Array.from(state.rooms.keys()).sort((a, b) => a - b);
+    },
+    getRoomBounds(unit) {
+      const room = state.rooms.get(Number.parseInt(String(unit), 10));
+      return room ? room.cornersXz.map((point) => {
+        const displayed = displayedPoint(point);
+        return [round6(displayed.x), round6(displayed.z)];
+      }) : null;
+    },
+    getRoomVertex,
+    updateRoomVertex,
+    getVertexHandleScreenState,
+    beginVertexDragForVerification,
+    moveVertexDragForVerification,
+    endVertexDragForVerification,
+    getFloorTransform,
+    setFloorTransform,
+    resetFloorTransform,
+    setEditorOpen,
+    setEditorMode,
+    getRoomScreenState(unit) {
+      return getRoomScreenState(unit);
+    },
+    getRoomVisualState(unit) {
+      const room = state.rooms.get(Number.parseInt(String(unit), 10));
+      if (!room) return null;
+      return {
+        selected: state.selectedRoom === room,
+        fillOpacity: round6(room.fillMaterial.opacity),
+        lineOpacity: round6(room.lineMaterial.opacity),
+        fillColor: room.fillMaterial.color.getHexString(),
+        lineColor: room.lineMaterial.color.getHexString(),
+      };
+    },
+    orbitSelectedRoomForVerification,
+    dispose() {
+      renderer.domElement.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove, { capture: true });
+      renderer.domElement.removeEventListener('pointerup', handlePointerUp, { capture: true });
+      renderer.domElement.removeEventListener('pointercancel', handlePointerUp, { capture: true });
+      endVertexDrag();
+      scene.remove(state.group);
+      state.group.traverse((child) => {
+        child.geometry?.dispose?.();
+        child.material?.dispose?.();
+      });
+      state.rooms.clear();
+    },
+  };
+  window.__roomKmlOverlay = api;
+  return api;
+}

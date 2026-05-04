@@ -7,7 +7,10 @@ export SERVER_HOST="${SERVER_HOST:-127.0.0.1}"
 export SERVER_PORT="${SERVER_PORT:-4173}"
 
 if command -v node >/dev/null 2>&1; then
-  exec node scripts/dev-server.mjs
+  # Serve from the repo root so relative imports like ../shared/* resolve.
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  exec node "$SCRIPT_DIR/dev-server.mjs" --root "$REPO_ROOT"
 fi
 
 if command -v python3 >/dev/null 2>&1; then
