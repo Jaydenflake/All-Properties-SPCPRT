@@ -2442,6 +2442,35 @@
                 background 220ms ease,
                 box-shadow 220ms ease;
         }
+        .renter-floorplan-panel.intro-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateY(-10px);
+            clip-path: inset(0 0 100% 0 round var(--rf-radius-panel));
+        }
+        .renter-floorplan-panel.intro-reveal {
+            transform-origin: top left;
+            animation: renter-panel-intro-reveal 1400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        @keyframes renter-panel-intro-reveal {
+            0% {
+                opacity: 0;
+                transform: translateY(-14px);
+                filter: blur(10px);
+                clip-path: inset(0 0 100% 0 round var(--rf-radius-panel));
+            }
+            42% {
+                opacity: 1;
+                filter: blur(5px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+                filter: blur(0);
+                clip-path: inset(0 0 0 0 round var(--rf-radius-panel));
+            }
+        }
         .renter-floorplan-panel::before {
             border-radius: inherit;
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.08) 100%);
@@ -2463,6 +2492,13 @@
             color: var(--rf-text-muted);
             font-weight: 500;
             letter-spacing: -0.005em;
+        }
+        .available-unit-prompt {
+            display: none;
+            color: var(--rf-text-soft);
+            font: 600 12.5px/1.2 -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+            letter-spacing: -0.004em;
+            padding: 0 2px;
         }
         .bed-filter-tabs {
             box-shadow: var(--rf-category-shadow);
@@ -2786,9 +2822,10 @@
         .renter-floorplan-panel.collapsed {
             display: grid !important;
             grid-template-columns: 36px minmax(0, 1fr);
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: auto auto 1fr auto;
             grid-template-areas:
                 "chevron title"
+                "prompt  prompt"
                 "list    list"
                 "actions actions";
             row-gap: 10px;
@@ -2817,6 +2854,10 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        .renter-floorplan-panel.collapsed .available-unit-prompt {
+            display: block;
+            grid-area: prompt;
         }
         .renter-floorplan-panel.collapsed .available-unit-list {
             grid-area: list;
@@ -3225,6 +3266,58 @@
             width: 14px; height: 14px;
             background: var(--rf-icon-close) center/contain no-repeat;
         }
+        .orbit-hint-overlay {
+            position: fixed;
+            left: 50%;
+            bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+            z-index: 60;
+            width: min(520px, calc(100vw - 40px));
+            transform: translate(-50%, 8px);
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            color: rgba(210, 214, 218, 0.72);
+            text-align: center;
+            text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+            font: 650 27px/1.12 -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+            letter-spacing: -0.02em;
+            transition:
+                opacity 620ms ease,
+                transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0s linear 620ms;
+        }
+        .orbit-hint-overlay.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0);
+            transition:
+                opacity 780ms ease,
+                transform 780ms cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0s;
+        }
+        .orbit-hint-overlay.hide {
+            opacity: 0;
+            visibility: visible;
+            transform: translate(-50%, 8px);
+            transition:
+                opacity 360ms ease,
+                transform 360ms ease,
+                visibility 0s linear 360ms;
+        }
+        @media (max-width: 720px) {
+            .orbit-hint-overlay {
+                bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+                width: min(520px, calc(100vw - 36px));
+                font-size: 23px;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .renter-floorplan-panel.intro-reveal,
+            .orbit-hint-overlay {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
         @media (max-width: 720px) {
             .unit-detail-modal { border-radius: var(--rf-radius-panel); }
             .unit-detail-content { padding: 22px 22px 120px; height: auto; overflow-y: auto; }
@@ -3414,6 +3507,8 @@
     <!-- Invisible overlay to detect outside clicks when details are open -->
     <div id="overlay-ui"></div>
 
+    <div id="orbitHintOverlay" class="orbit-hint-overlay" aria-hidden="true">Drag to rotate view</div>
+
     <div class="menu-container" id="menuContainer">
         <div id="detailsButton" class="menu-button">
             <img src="https://raw.githubusercontent.com/HansenHomeAI/FigmaSVGButtons/main/DetailsIconDefault.svg" alt="Details" draggable="false">
@@ -3438,7 +3533,7 @@
         <div id="stackUnitDropdown" class="stack-unit-dropdown" role="listbox" aria-label="3D unit results"></div>
     </div>
 
-    <section id="renterFloorplanPanel" class="renter-floorplan-panel" aria-live="polite">
+    <section id="renterFloorplanPanel" class="renter-floorplan-panel intro-hidden" aria-live="polite">
         <button id="mobileAvailabilityButton" class="mobile-availability-button" type="button" aria-label="See Available Units">See Available Units</button>
         <button id="mobileFloorplanClose" class="mobile-floorplan-close" type="button" aria-label="Close floor plan selector"></button>
         <div class="renter-floorplan-title">
@@ -3448,6 +3543,7 @@
         <div id="bedFilterTabs" class="bed-filter-tabs" role="group" aria-label="Bedrooms"></div>
         <div id="floorplanResults" class="floorplan-results"></div>
         <button id="changeFloorplanButton" class="change-floorplan-button" type="button" aria-label="Select a different floor plan">Select a Different Floor Plan</button>
+        <div id="availableUnitPrompt" class="available-unit-prompt">select an available unit</div>
         <div id="availableUnitList" class="available-unit-list"></div>
         <div id="mobileUnitActions" class="mobile-unit-actions">
             <button id="mobileSeeDetailsButton" class="mobile-unit-action details" type="button">View Details</button>
@@ -3917,9 +4013,7 @@
         document.getElementById('availableUnitList')?.classList.remove('needs-selection');
         document.getElementById('renterFloorplanStatus')?.classList.remove('mobile-prompt-visible');
         window.__roomKmlOverlay?.clearStackSelection?.({ statusText: 'Choose a floor plan to highlight available units.' });
-        if (typeof setActiveHole === 'function') {
-            setActiveHole(activeHoleIndex || 0, { resetCamera: true });
-        }
+        recenterCameraOnBuilding({ resetCamera: true });
         const panel = document.getElementById('renterFloorplanPanel');
         panel?.classList.remove('collapsed', 'mobile-selector-open');
         panel?.classList.add('mobile-closed');
@@ -3982,6 +4076,94 @@
     function stopSelectedUnitOrbit() {
         renterSelectedOrbit.active = false;
         renterSelectedOrbit.target = null;
+    }
+
+    function recenterCameraOnBuilding({ resetCamera = true, durationMs = 1050 } = {}) {
+        if (renterOrbitTargetAnimation) {
+            cancelAnimationFrame(renterOrbitTargetAnimation);
+            renterOrbitTargetAnimation = null;
+        }
+        stopSelectedUnitOrbit();
+        if (typeof controls === 'undefined' || !controls?.target) return;
+        if (typeof camera === 'undefined' || !camera?.position) return;
+        if (typeof pauseCameraAutomationFromInteraction === 'function') pauseCameraAutomationFromInteraction();
+
+        const holeConfig = getActiveHoleConfig?.();
+        const viewConfig = holeConfig?.view || {};
+        const target = viewConfig.target || parameters.scene.origin;
+        const endTarget = new Vector3(target.x, target.y, target.z);
+        const configuredStart = viewConfig.startPosition || parameters.camera.startPosition;
+        const configuredStartPosition = new Vector3(
+            configuredStart.x,
+            configuredStart.y,
+            configuredStart.z
+        );
+        applyMobileCameraDistance(configuredStartPosition, endTarget);
+
+        const startTarget = controls.target.clone();
+        const startPosition = camera.position.clone();
+        const fallbackDirection = configuredStartPosition.clone().sub(endTarget);
+        const endDirection = camera.position.clone().sub(endTarget);
+        if (endDirection.lengthSq() < 0.0001) endDirection.copy(fallbackDirection);
+        if (endDirection.lengthSq() < 0.0001) endDirection.set(0, 0.45, 1);
+        endDirection.normalize();
+
+        const standardDistance = Math.max(0.6, configuredStartPosition.distanceTo(endTarget));
+        const endPosition = endTarget.clone().add(endDirection.multiplyScalar(standardDistance));
+        if (Number.isFinite(parameters?.camera?.minY)) {
+            endPosition.y = Math.max(endPosition.y, parameters.camera.minY);
+        }
+
+        controls.minDistance = Number.isFinite(viewConfig.minDistance) ? viewConfig.minDistance : 0.6;
+        controls.maxDistance = Math.max(controls.minDistance + 0.01, getConfiguredMaxDistance(holeConfig));
+        controls.minPolarAngle = MathUtils.degToRad(Number.isFinite(viewConfig.minPolarAngle) ? viewConfig.minPolarAngle : 14);
+        controls.maxPolarAngle = MathUtils.degToRad(Number.isFinite(viewConfig.maxPolarAngle) ? viewConfig.maxPolarAngle : 84);
+        if (Number.isFinite(viewConfig.northDirection)) {
+            parameters.compass.northDirection = viewConfig.northDirection;
+        }
+
+        if (!resetCamera) {
+            controls.target.copy(endTarget);
+            camera.lookAt(controls.target);
+            controls.update();
+            updateCompassIcon();
+            return;
+        }
+
+        const flightDurationMs = cameraFlightDuration(startPosition, endPosition, startTarget, endTarget, durationMs);
+        const startedAt = performance.now();
+        const animateFrame = (now) => {
+            const progress = Math.min(Math.max((now - startedAt) / flightDurationMs, 0), 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            controls.target.lerpVectors(startTarget, endTarget, eased);
+            camera.position.lerpVectors(startPosition, endPosition, eased);
+            camera.lookAt(controls.target);
+            manualFocusTargetY = controls.target.y;
+            controls.update();
+            if (progress < 1) {
+                renterOrbitTargetAnimation = requestAnimationFrame(animateFrame);
+                return;
+            }
+            controls.target.copy(endTarget);
+            camera.position.copy(endPosition);
+            camera.lookAt(controls.target);
+            manualFocusTargetY = null;
+            controls.update();
+            updateCompassIcon();
+            renterOrbitTargetAnimation = null;
+        };
+        renterOrbitTargetAnimation = requestAnimationFrame(animateFrame);
+    }
+
+    function recenterCameraOnSelectedFloorplan(durationMs = 1050) {
+        const unitNumbers = renterFloorplanState.selectedUnits.map((unit) => unit.unit_number).filter(Boolean);
+        if (!unitNumbers.length) return false;
+        const overlay = window.__roomKmlOverlay;
+        overlay?.setFocusedStackUnit?.(null);
+        const frame = overlay?.getStackFrameForUnits?.(unitNumbers) || overlay?.getSelectedStackFrame?.();
+        if (!frame) return false;
+        focusCameraOnStackFrame(frame, durationMs);
+        return true;
     }
 
     function startSelectedUnitOrbit(target, position, selectedCount = 1) {
@@ -4171,6 +4353,7 @@
                 stopSelectedUnitOrbit();
                 openMobileFloorplanSelector();
                 window.__roomKmlOverlay?.clearStackSelection?.({ statusText: 'Choose a floor plan to highlight available units.' });
+                recenterCameraOnBuilding({ resetCamera: true });
                 renderBedFilters();
                 renderFloorplanCards();
                 renderAvailableUnitList();
@@ -4374,6 +4557,7 @@
         stopSelectedUnitOrbit();
         openMobileFloorplanSelector();
         window.__roomKmlOverlay?.clearStackSelection?.({ statusText: 'Choose a floor plan to highlight available units.' });
+        recenterCameraOnBuilding({ resetCamera: true });
         renderBedFilters();
         renderFloorplanCards();
         renderAvailableUnitList();
@@ -4482,7 +4666,11 @@
         document.getElementById('unitDetailBackdrop')?.classList.remove('active');
         if (clearSelection) {
             renterFloorplanState.selectedUnitNumber = null;
+            window.__roomKmlOverlay?.setFocusedStackUnit?.(null);
             renderAvailableUnitList();
+            if (!recenterCameraOnSelectedFloorplan(950)) {
+                recenterCameraOnBuilding({ resetCamera: true });
+            }
         }
     }
 
@@ -4520,7 +4708,7 @@
         }
     }
 
-    initRenterFloorplanBrowser();
+    window.__renterFloorplanBrowserReady = initRenterFloorplanBrowser();
 
     // Inlined from tap-focus-refinement.mjs (tap-to-focus geometry/sampling helpers)
     const HALF_FLOAT_SIGN_MASK = 0x8000;
@@ -4950,6 +5138,7 @@
 	    let controls = new OrbitControls(camera, renderer.domElement);
 	    controls.enableDamping = true;
 	    controls.dampingFactor = 0.08;
+        controls.enablePan = false;
     controls.zoomSpeed = 0.5;  // Original orbital: halved zoom sensitivity
     controls.minDistance = 0.6;
     controls.maxDistance = calculateMaxDistance();
@@ -4960,7 +5149,7 @@
     }
 	    controls.target.set(parameters.scene.origin.x, parameters.scene.origin.y, parameters.scene.origin.z);
         applyMobileCameraDistance(camera.position, controls.target);
-	    controls.update();
+    controls.update();
 
 	    function enablePanelDragPassThrough(panel, canvas, options = {}) {
 	        if (!panel || !canvas) return () => {};
@@ -6792,12 +6981,17 @@
     }
 
     function pauseCameraAutomationFromInteraction() {
+        if (renterOrbitTargetAnimation) {
+            cancelAnimationFrame(renterOrbitTargetAnimation);
+            renterOrbitTargetAnimation = null;
+        }
         if (tapFocusTransition.active) {
             tapFocusTransition.active = false;
             tapFocusState.debug.transitionActive = false;
             tapFocusState.debug.transitionProgress = 1;
         }
         stopSelectedUnitOrbit();
+        isAnimatingToNorth = false;
         autoRotate = false;
         if (pathAnimationState.playing) {
             pathAnimationState.playing = false;
@@ -6826,6 +7020,9 @@
     const tapDotClickMoveThreshold = 10;
     window.addEventListener('pointerdown', (event) => {
         lastPointerDownForTapDot = { x: event.clientX, y: event.clientY };
+        if (!event.isPrimary) return;
+        if (performance.now() < ignoreNextPauseUntil) return;
+        if (isPointerOn3DScene(event)) pauseCameraAutomationFromInteraction();
     }, { passive: true });
 
     function handleTapDotActivation(event) {
@@ -6925,15 +7122,14 @@
     window.addEventListener('click', (event) => {
         if (performance.now() < suppressTapDotClickUntil) return;
         const handledTapDot = handleTapDotActivation(event);
-        if (!handledTapDot && wasTapAtSameSpot(event) && isPointerOn3DScene(event)) focusCameraOnTappedPoint(event);
+        if (handledTapDot) suppressTapDotClickUntil = performance.now() + 700;
     });
 
     window.addEventListener('pointerup', (event) => {
         if (!event.isPrimary) return;
         if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
         const handledTapDot = handleTapDotActivation(event);
-        const focused = handledTapDot ? false : (wasTapAtSameSpot(event) && isPointerOn3DScene(event) && focusCameraOnTappedPoint(event));
-        if (handledTapDot || focused) suppressTapDotClickUntil = performance.now() + 700;
+        if (handledTapDot) suppressTapDotClickUntil = performance.now() + 700;
     }, { passive: true });
 
     window.addEventListener('touchend', (event) => {
@@ -6946,8 +7142,7 @@
             target: event.target
         };
         const handledTapDot = handleTapDotActivation(syntheticTapEvent);
-        const focused = handledTapDot ? false : (wasTapAtSameSpot(syntheticTapEvent) && isPointerOn3DScene(syntheticTapEvent) && focusCameraOnTappedPoint(syntheticTapEvent));
-        if (handledTapDot || focused) suppressTapDotClickUntil = performance.now() + 700;
+        if (handledTapDot) suppressTapDotClickUntil = performance.now() + 700;
     }, { passive: true });
 
     // Render loop is started above (no longer gated on icon load)
@@ -7050,6 +7245,86 @@
     };
 
     setActiveHole(0, { resetCamera: true });
+
+    function revealInitialFloorplanPanel() {
+        const panel = document.getElementById('renterFloorplanPanel');
+        if (!panel || !panel.classList.contains('intro-hidden')) return;
+        const reveal = () => {
+            panel.classList.remove('intro-hidden');
+            panel.classList.add('intro-reveal');
+            window.setTimeout(() => {
+                panel.classList.remove('intro-reveal');
+            }, 1600);
+        };
+        const ready = window.__renterFloorplanBrowserReady;
+        if (ready && typeof ready.finally === 'function') {
+            ready.finally(reveal);
+        } else {
+            reveal();
+        }
+    }
+
+    function runInitialOnboardingSequence() {
+        const overlay = document.getElementById('orbitHintOverlay');
+        const modelRevealMs = 3300;
+        const postRevealDelayMs = 700;
+        const panelRevealDelayMs = 1800;
+        const hintStartMs = modelRevealMs + postRevealDelayMs;
+        let hintDismissed = false;
+        let hintSwapIntervalId = 0;
+        const hintMessages = [
+            'Drag to rotate view',
+            isMobileRenterLayout() ? 'Pinch to Zoom' : 'Scroll to Zoom'
+        ];
+        let hintMessageIndex = 0;
+
+        if (!overlay) {
+            window.setTimeout(revealInitialFloorplanPanel, hintStartMs + panelRevealDelayMs);
+            return;
+        }
+
+        const dismissHint = () => {
+            if (hintDismissed) return;
+            hintDismissed = true;
+            if (hintSwapIntervalId) {
+                window.clearInterval(hintSwapIntervalId);
+                hintSwapIntervalId = 0;
+            }
+            overlay.classList.remove('show');
+            overlay.classList.add('hide');
+            window.setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 420);
+            window.removeEventListener('pointerdown', dismissHint, true);
+            window.removeEventListener('touchstart', dismissHint, true);
+        };
+
+        window.addEventListener('pointerdown', dismissHint, { capture: true, passive: true });
+        window.addEventListener('touchstart', dismissHint, { capture: true, passive: true });
+
+        window.setTimeout(() => {
+            if (hintDismissed) return;
+            overlay.textContent = hintMessages[hintMessageIndex];
+            overlay.classList.remove('hide');
+            overlay.classList.add('show');
+            hintSwapIntervalId = window.setInterval(() => {
+                if (hintDismissed) return;
+                hintMessageIndex = (hintMessageIndex + 1) % hintMessages.length;
+                overlay.classList.remove('show');
+                window.setTimeout(() => {
+                    if (hintDismissed) return;
+                    overlay.textContent = hintMessages[hintMessageIndex];
+                    overlay.classList.add('show');
+                }, 320);
+            }, 2600);
+        }, hintStartMs);
+
+        window.setTimeout(() => {
+            revealInitialFloorplanPanel();
+        }, hintStartMs + panelRevealDelayMs);
+    }
+
+    runInitialOnboardingSequence();
 
     function setAnimationEditorStatus(message) {
         if (animationEditorStatus) {

@@ -43,8 +43,8 @@ const STACK_CUBE_COLOR = 0xffffff;
 const STACK_CUBE_OPACITY = 0;
 const SELECTED_STACK_CUBE_COLOR = 0x72f59b;
 const DEFAULT_SELECTED_STACK_CUBE_OPACITY = 0.42;
-const FOCUSED_STACK_SIBLING_OPACITY = 0.08;
-const FOCUSED_STACK_SIBLING_LABEL_OPACITY = 1;
+const FOCUSED_STACK_SIBLING_OPACITY = 0.065;
+const FOCUSED_STACK_SIBLING_LABEL_OPACITY = 0.065;
 const STACK_UNIT_DOUBLE_TAP_MS = 420;
 const STACK_UNIT_DOUBLE_TAP_PX = 28;
 const DEFAULT_FLOOR_ROTATION_DEG = 0;
@@ -2121,7 +2121,7 @@ export function initRoomKmlOverlay({
   function selectStackCubeFromPointer(event) {
     const hit = detectSelectedStackUnitFromPointer(event);
     const unit = hit?.unit || null;
-    if (!unit || hit.source !== 'label') {
+    if (!unit) {
       state.lastStackTap = null;
       return false;
     }
@@ -2329,7 +2329,7 @@ export function initRoomKmlOverlay({
   function handlePointerMove(event) {
     if (!moveStackHeightDrag(event) && !movePlanGizmoDrag(event) && !moveVertexDrag(event)) {
       const hit = event.pointerType === 'mouse' ? detectSelectedStackUnitFromPointer(event) : null;
-      setHoveredStackUnit(hit?.source === 'label' ? hit.unit : null);
+      setHoveredStackUnit(hit?.unit || null);
       return;
     }
     event.preventDefault();
