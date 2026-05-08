@@ -16,6 +16,8 @@
             touch-action: none; /* Disable default touch behaviors */
             user-select: none; /* Disable text selection */
             -webkit-user-select: none; /* Safari specific styling */
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
         }
 
         /* Hart Bench Ranch UI Font Override */
@@ -2830,7 +2832,7 @@
                 "actions actions";
             row-gap: 10px;
             column-gap: 10px;
-            max-height: calc(38dvh - env(safe-area-inset-bottom, 0px));
+            max-height: min(330px, calc(42vh - env(safe-area-inset-bottom, 0px)));
             min-height: 0;
         }
         .renter-floorplan-panel.collapsed .change-floorplan-button {
@@ -2997,7 +2999,7 @@
                 left: 12px;
                 width: auto;
                 max-width: none;
-                max-height: calc(38dvh - env(safe-area-inset-bottom, 0px));
+                max-height: min(330px, calc(42vh - env(safe-area-inset-bottom, 0px)));
                 padding: 10px 10px 0;
                 border-radius: var(--rf-radius-panel);
                 background: var(--rf-surface);
@@ -3383,7 +3385,7 @@
                 top: auto !important;
                 width: auto !important;
                 height: auto !important;
-                max-height: 22dvh !important;
+                max-height: min(185px, 22vh) !important;
                 z-index: 1 !important;
                 padding: 8px !important;
                 border-radius: var(--rf-radius-card) !important;
@@ -3441,6 +3443,20 @@
             }
             .renter-floorplan-panel.collapsed:not(.mobile-selector-open) .available-unit-list.needs-selection::before {
                 display: none !important;
+            }
+        }
+
+        @supports (height: 100svh) {
+            @media (max-width: 720px) {
+                .renter-floorplan-panel.collapsed,
+                .renter-floorplan-panel.collapsed:not(.mobile-selector-open) {
+                    max-height: min(330px, calc(42svh - env(safe-area-inset-bottom, 0px))) !important;
+                }
+                .renter-floorplan-panel.collapsed:not(.mobile-selector-open) .available-unit-list,
+                .renter-floorplan-panel.collapsed:not(.mobile-selector-open) .available-unit-list.units-count-1,
+                .renter-floorplan-panel.collapsed:not(.mobile-selector-open) .available-unit-list.units-count-2 {
+                    max-height: min(185px, 22svh) !important;
+                }
             }
         }
 
@@ -4571,6 +4587,7 @@
     function selectUnitForMobile(unitNumber) {
         const unit = renterFloorplanState.selectedUnits.find((entry) => String(entry.unit_number) === String(unitNumber)) || null;
         if (!unit) return;
+        closeUnitDetail({ clearSelection: false });
         renterFloorplanState.selectedUnitNumber = String(unit.unit_number);
         renderAvailableUnitList();
         const overlay = window.__roomKmlOverlay;
@@ -4578,6 +4595,14 @@
         const unitFrame = overlay?.getStackFrameForUnits?.([unit.unit_number]);
         if (unitFrame) focusCameraOnStackFrame(unitFrame, 950);
         setRenterStatus(`Unit ${unit.unit_number} selected.`);
+    }
+
+    function handleStackUnitClick(unitNumber) {
+        if (isMobileRenterLayout()) {
+            selectUnitForMobile(unitNumber);
+            return;
+        }
+        openUnitDetail(unitNumber);
     }
 
     function openUnitDetail(unitNumber, { focusCamera = true } = {}) {
@@ -5309,7 +5334,7 @@
             kmlUrl: 'exports/canyon-vista-units.kml',
             borderDotPositions: borderDotPositionsByHole[0],
             pauseCameraAutomation: pauseCameraAutomationFromInteraction,
-            onStackUnitClick: openUnitDetail,
+            onStackUnitClick: handleStackUnitClick,
             elements: {
                 panel: document.getElementById('roomLookupPanel'),
                 input: document.getElementById('roomSearchInput'),
