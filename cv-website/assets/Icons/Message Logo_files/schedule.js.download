@@ -1,0 +1,571 @@
+function addScheduler(selector, shadow = false) {
+    let scheduleHolder;
+
+    if (shadow) {
+        scheduleHolder = shadow.querySelector(selector);
+    } else {
+        scheduleHolder = document.querySelector(selector);
+    }
+
+    if (!scheduleHolder) {
+        return;
+    }
+
+    const scheduler = document.createElement('div');
+    const loader = document.createElement('div');
+    const controls = document.createElement('div');
+    const controlLeft = document.createElement('button');
+    const controlRight = document.createElement('button');
+    const hideDates = document.createElement('button');
+    const dateHolder = document.createElement('div');
+    const timeHolder = document.createElement('div');
+    const propertyCode = scheduleHolder.getAttribute('data-property-code');
+    const inputName = scheduleHolder.getAttribute('data-input-name');
+    const noValidate = scheduleHolder.getAttribute('data-no-validate');
+    const maxDays = scheduleHolder.getAttribute('data-max-days') ? parseInt(scheduleHolder.getAttribute('data-max-days')) : 30;
+    const parentForm = scheduleHolder.closest('form');
+    const startDelay = parseInt(scheduleHolder.getAttribute('data-start-delay') ?? 0);
+    const start = new Date(
+        new Date().getTime() + ((1 + startDelay) * 24 * 60 * 60 * 1000)
+    ).toLocaleDateString('en-ZA');
+
+    let numDays;
+    let timeOutFunctionId;
+    let infoBox;
+    let buttonClasses;
+
+    if (scheduleHolder.getAttribute('data-button-class')) {
+	    buttonClasses = scheduleHolder.getAttribute('data-button-class').split(' ');
+    } else {
+        buttonClasses = [];
+    }
+
+    scheduler.classList.add('scheduler');
+    scheduler.setAttribute('data-unavailable-hidden', 'false');
+    scheduler.setAttribute('data-window-width', window.innerWidth);
+
+    loader.classList.add('schedule-loader');
+    loader.classList.add('hide');
+
+    dateHolder.setAttribute('role', 'tablist');
+    dateHolder.classList.add('date-holder');
+
+    timeHolder.classList.add('time-holder');
+
+    controlLeft.classList.add('schedule-controls');
+    controlLeft.classList.add('left');
+    controlLeft.classList.add(...buttonClasses);
+    controlLeft.setAttribute('type', 'button');
+    controlLeft.addEventListener('click', function (event) {
+        event.preventDefault();
+        fillTimes(this.getAttribute('data-start-date'))
+    });
+    controlLeft.innerHTML = `
+        <svg class="control-arrow" width="24" height="24" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd" clip-rule="evenodd"><path d="M2.117 12l7.527 6.235-.644.765-9-7.521 9-7.479.645.764-7.529 6.236h21.884v1h-21.883z"/></svg>
+        <div class="control-text">
+        </div>
+    `;
+
+    controlRight.classList.add('schedule-controls');
+    controlRight.classList.add('right');
+    controlRight.classList.add(...buttonClasses);
+    controlRight.setAttribute('type', 'button');
+    controlRight.addEventListener('click', function (event) {
+        event.preventDefault();
+        fillTimes(this.getAttribute('data-start-date'))
+    });
+    controlRight.innerHTML = `
+        <div class="control-text">
+        </div>
+        <svg class="control-arrow" width="24" height="24" xmlns="http://www.w3.org/2000/svg" fill-rule="evenodd" clip-rule="evenodd"><path d="M21.883 12l-7.527 6.235.644.765 9-7.521-9-7.479-.645.764 7.529 6.236h-21.884v1h21.883z"/></svg>
+    `;
+
+    hideDates.classList.add('hider');
+    hideDates.classList.add(...buttonClasses);
+    hideDates.setAttribute('type', 'button');
+    hideDates.setAttribute('data-hidden', 'false');
+    hideDates.innerHTML = 'Hide Unavailable Dates';
+    hideDates.addEventListener('click', () => {
+        if (scheduler.getAttribute('data-unavailable-hidden') === 'true') {
+            scheduler.setAttribute('data-unavailable-hidden', 'false');
+            hideDates.innerHTML = 'Hide Unavailable Dates';
+            fillTimes(scheduler.getAttribute('data-current-start'));
+        } else {
+            scheduler.setAttribute('data-unavailable-hidden', 'true');
+            hideDates.innerHTML = 'Show Unavailable Dates';
+            fillTimes(scheduler.getAttribute('data-current-start'));
+        }
+    });
+
+    controls.classList.add('controls');
+    controls.appendChild(controlLeft);
+    controls.appendChild(controlRight);
+
+    scheduleHolder.appendChild(scheduler);
+
+    scheduler.appendChild(loader);
+    scheduler.appendChild(controls);
+    scheduler.appendChild(hideDates);
+    scheduler.appendChild(dateHolder);
+    scheduler.appendChild(timeHolder);
+
+    if (scheduleHolder.getAttribute('data-info-id')) {
+        if (shadow) {
+            infoBox = shadow.getElementById(scheduleHolder.getAttribute('data-info-id'));
+        } else {
+            infoBox = document.getElementById(scheduleHolder.getAttribute('data-info-id'));
+        }
+    } else {
+        infoBox = document.createElement('div');
+        infoBox.classList.add('schedule-info');
+        infoBox.setAttribute('aria-live', 'polite');
+
+        scheduler.appendChild(infoBox);
+    }
+
+
+    if (!noValidate) {
+        parentForm.addEventListener('submit', function(event) {
+            let confirmTourTime;
+
+            if (parentForm.querySelector('input[name="' + inputName + '"]:checked')) {
+                confirmTourTime = parentForm.querySelector('input[name="' + inputName + '"]:checked').value;
+                readableTime = parentForm.querySelector('input[name="' + inputName + '"]:checked').getAttribute('data-date-time');
+            } else {
+                event.preventDefault();
+                infoBox.classList.add('error');
+                infoBox.innerHTML = 'Please select a tour time before submitting the form';
+                return false;
+            }
+
+            confirmTour(confirmTourTime, readableTime).then((response) => {
+                if(!response) {
+                    event.preventDefault();
+                    return false;
+                }
+            });
+        });
+    }
+
+    window.addEventListener('resize', () => {
+        if (scheduler.getAttribute('data-window-width') != window.innerWidth) {
+            scheduler.setAttribute('data-window-width', window.innerWidth);
+            clearTimeout(timeOutFunctionId);
+            timeOutFunctionId = setTimeout(() => {fillTimes(scheduler.getAttribute('data-current-start'))}, 500);
+        }
+    });
+
+    fillTimes(start);
+
+    function fillTimes(startDate) {
+        let hideUnavailable = false;
+
+        if (scheduler.getAttribute('data-unavailable-hidden') === 'true') {
+            hideUnavailable = true;
+        }
+
+        controlLeft.setAttribute('disabled', true);
+        controlRight.setAttribute('disabled', true);
+
+        numDays = getNumDays(scheduleHolder);
+
+        loader.classList.remove('hide');
+
+        getTimes(startDate, numDays, propertyCode, hideUnavailable).then((times) => {
+            let begin = true;
+            loader.classList.add('hide');
+
+            dateHolder.replaceChildren();
+            timeHolder.replaceChildren();
+
+            if (times) {
+                if (times.has_hours || typeof times.has_hours === 'undefined') {
+                    updateControls(times, hideUnavailable);
+                    for (const [key, value] of Object.entries(times)) {
+
+                        if (begin && value.length) {
+                            addDateTimes(key, value, true);
+                            begin = false;
+                        } else {
+                            addDateTimes(key, value);
+                        }
+                    }
+                } else {
+                    scheduler.style.minHeight = '100px';
+                    scheduler.innerHTML = `
+                        <p>No tours available, please <a href="/contact" style="font-weight:bold">contact us for information</a>.</p>
+                    `;
+                }
+            } else {
+                infoBox.classList.add('error');
+                infoBox.innerHTML = 'Something went wrong, please refresh the page and try again';
+            }
+        })
+        .catch((e) => {
+            console.error(e.message);
+        });
+    }
+
+    function updateControls(times, hideUnavailable) {
+        let numDays;
+
+        for (let i = 0; i < Object.keys(times).length; i++) {
+            if(Object.keys(times)[Object.keys(times).length - 1].startsWith('2')) {
+                break;
+            } else {
+                delete times[Object.keys(times)[Object.keys(times).length - 1]];
+            }
+        }
+
+        let firstDate = Object.keys(times)[0].replaceAll('-', '/');
+        const lastDate = Object.keys(times)[Object.keys(times).length - 1].replaceAll('-', '/');
+
+        scheduler.setAttribute('data-current-start', firstDate);
+
+        numDays = getNumDays(scheduleHolder);
+
+        const end = new Date(
+            new Date().getTime() + ((maxDays/numDays - 1) * numDays * 24 * 60 * 60 * 1000)
+        );
+
+        if (new Date(start + ', 12:00:00') < new Date(firstDate + ', 12:00:00')) {
+            controlLeft.removeAttribute('disabled');
+            if (new Date(start + ', 12:00:00') > new Date(new Date(firstDate + ', 12:00:00').getTime() - (numDays * 24 * 60 *60 * 1000))) {
+                firstDate = new Date(new Date(start + ', 12:00:00').getTime() + (numDays * 24 * 60 * 60 * 1000)).toLocaleDateString('en-ZA');
+            }
+        }
+
+        if (new Date(end.toDateString() + ', 12:00:00') >= new Date(firstDate + ', 12:00:00')) {
+            controlRight.removeAttribute('disabled');
+        }
+
+        controlLeft.setAttribute(
+            'data-start-date',
+            new Date(
+                new Date(firstDate + ', ' + '12:00:00')
+                .getTime()
+                - (numDays * 24 * 60 *60 * 1000)
+            )
+            .toLocaleDateString('en-ZA')
+        );
+
+        controlRight.setAttribute(
+            'data-start-date',
+            new Date(
+                new Date(lastDate + ', ' + '12:00:00')
+                .getTime()
+                + (24 * 60 *60 * 1000)
+            )
+            .toLocaleDateString('en-ZA')
+        );
+
+        if (hideUnavailable) {
+            controlLeft.querySelector('.control-text').innerHTML = 'Previous ' + numDays + ' Days';
+            controlRight.querySelector('.control-text').innerHTML = 'Next ' + numDays + ' Days';
+        } else {
+            controlLeft.querySelector('.control-text').innerHTML = (
+                new Date(
+                    new Date(firstDate + ', ' + '12:00:00')
+                    .getTime()
+                    - (numDays * 24 * 60 *60 * 1000)
+                )
+                .toDateString()
+                .split(' ')
+                .splice(0, 3)
+                .join(' ')
+            ) + ' - ' + (
+                new Date(
+                    new Date(firstDate + ', ' + '12:00:00')
+                    .getTime()
+                    - (1 * 24 * 60 *60 * 1000)
+                )
+                .toDateString()
+                .split(' ')
+                .splice(0, 3)
+                .join(' ')
+            );
+
+            controlRight.querySelector('.control-text').innerHTML = (
+                new Date(
+                    new Date(lastDate + ', ' + '12:00:00')
+                    .getTime()
+                    + (24 * 60 *60 * 1000)
+                )
+                .toDateString()
+                .split(' ')
+                .splice(0, 3)
+                .join(' ')
+            ) + ' - ' + (
+                new Date(
+                    new Date(lastDate + ', ' + '12:00:00')
+                    .getTime()
+                    + ((numDays) * 24 * 60 *60 * 1000)
+                )
+                .toDateString()
+                .split(' ')
+                .splice(0, 3)
+                .join(' ')
+            );
+        }
+    }
+
+    function addDateTimes(date, times, setActive = false) {
+        date = date.replaceAll('-', '/');
+        const timeTab = document.createElement('div');
+        const timeField = document.createElement('fieldset');
+        const dateButton = document.createElement('div');
+        const formattedDate = new Date(date + ', 12:00:00').toDateString().split(' ').splice(0, 3).join(' ');
+        let timeButton;
+        let timeRadio;
+        let timeLabel;
+        let formattedTime;
+        let timeHour;
+        let timeMinute;
+        let numDays;
+
+        numDays = getNumDays(scheduleHolder);
+
+        if (new Date(new Date(start + ', 12:00:00').getTime() + (maxDays * 24 * 60 * 60 * 1000)) >= new Date(date + ', 12:00:00')) {
+
+            dateButton.classList.add('schedule-date');
+            dateButton.classList.add(...buttonClasses);
+            dateButton.id = date + '-date';
+            dateButton.setAttribute('aria-controls', date + '-times');
+            dateButton.setAttribute('role', 'tab');
+            dateButton.style.width = Math.floor(100/numDays) + '%';
+            dateButton.innerHTML = formattedDate + '<br><small>' + times.length + ' available</small>';
+
+            timeTab.classList.add('schedule-times');
+            timeTab.id = date + '-times';
+            timeTab.setAttribute('aria-labelledby', date + '-date');
+            timeTab.setAttribute('role', 'tabpanel');
+
+            timeField.classList.add('schedule-times-field');
+            timeField.innerHTML = '<legend>Availability for ' + formattedDate + '</legend>';
+
+            if(setActive) {
+                dateButton.classList.add('active');
+                dateButton.setAttribute('aria-selected', true);
+                dateButton.setAttribute('tabindex', 0);
+                timeTab.classList.add('show');
+            } else {
+                dateButton.setAttribute('tabindex', -1);
+                dateButton.setAttribute('aria-selected', false);
+                timeTab.setAttribute('hidden', true);
+            }
+
+            timeHolder.appendChild(timeTab);
+            timeTab.appendChild(timeField);
+            dateHolder.appendChild(dateButton);
+
+            if (times.length) {
+                dateButton.addEventListener('click', (event) => {
+                    changeTimeTabs(dateButton, timeTab)
+                });
+
+                dateButton.addEventListener('keyup', (e) => {
+                    if (e.key === 'ArrowRight') {
+                        moveNextTab(dateButton);
+                    } else if (e.key === 'ArrowLeft') {
+                        movePreviousTab(dateButton);
+                    } else if (e.key === 'Enter') {
+                        changeTimeTabs(dateButton, timeTab)
+                    }
+                });
+
+                for (let i = 0; i < times.length; i++) {
+                    timeHour = parseInt(times[i].split(':')[0]);
+                    timeMinute = times[i].split(':')[1];
+
+                    if (timeHour > 12) {
+                        formattedTime = (timeHour - 12) + ':' + timeMinute + ' PM';
+                    } else if (timeHour === 0) {
+                        formattedTime = 12 + ':' + timeMinute + ' AM';
+                    } else if (timeHour === 12) {
+                        formattedTime = 12 + ':' + timeMinute + ' PM';
+                    } else {
+                        formattedTime = timeHour + ':' + timeMinute + ' AM';
+                    }
+
+                    timeButton = document.createElement('div');
+                    timeRadio = document.createElement('input');
+                    timeLabel = document.createElement('label');
+
+                    timeButton.classList.add('schedule-time-button');
+
+                    timeRadio.setAttribute('data-date-time', formattedDate + ' ' + formattedTime);
+                    timeRadio.setAttribute('type', 'radio');
+                    timeRadio.setAttribute('required', true);
+                    timeRadio.setAttribute('name', inputName);
+                    timeRadio.id = date.replaceAll('/', '-') + 'T' + times[i].replaceAll(':', '-');
+                    timeRadio.setAttribute('value', date.replaceAll('/', '-') + 'T' + times[i] + ':00');
+                    timeRadio.addEventListener('change', function (event) {
+                        event.preventDefault();
+                        selectTime(this);
+                    });
+                    timeRadio.addEventListener('keydown', function (event) {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                        }
+                    });
+
+                    timeLabel.setAttribute('for', date.replaceAll('/', '-') + 'T' + times[i].replaceAll(':', '-'));
+                    timeLabel.innerHTML = formattedTime;
+
+                    timeButton.appendChild(timeRadio);
+                    timeButton.appendChild(timeLabel);
+
+                    timeField.appendChild(timeButton);
+                }
+            } else {
+                dateButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                });
+                dateButton.classList.add('disabled');
+                dateButton.setAttribute('disabled', true);
+            }
+        }
+    }
+
+    function changeTimeTabs(targetButton, targetTab) {
+        let timeTabs;
+        let dateButtons;
+
+        if (shadow) {
+            timeTabs = shadow.querySelectorAll('.schedule-times');
+            dateButtons = shadow.querySelectorAll('.schedule-date');
+        } else {
+            timeTabs = document.querySelectorAll('.schedule-times');
+            dateButtons = document.querySelectorAll('.schedule-date');
+        }
+
+        for(let i = 0; i < timeTabs.length; i++) {
+            timeTabs[i].classList.remove('show');
+            timeTabs[i].setAttribute('hidden', true);
+        }
+
+        for(let j = 0; j < dateButtons.length; j++) {
+            dateButtons[j].classList.remove('active');
+            dateButtons[j].setAttribute('aria-selected', false);
+            dateButtons[j].setAttribute('tabindex', -1);
+        }
+
+        targetTab.classList.add('show');
+        targetTab.querySelector('input').focus();
+        targetTab.removeAttribute('hidden');
+
+        targetButton.classList.add('active');
+        targetButton.setAttribute('aria-selected', true);
+        targetButton.setAttribute('tabindex', 0);
+    }
+
+    function selectTime(targetButton) {
+        const timeButtons = scheduler.querySelectorAll('.schedule-time-button');
+
+        for(let i = 0; i < timeButtons.length; i++) {
+            timeButtons[i].classList.remove('active');
+        }
+
+        targetButton.parentElement.classList.add('active');
+    }
+
+    function confirmTour(time, readableTime) {
+        const date = time.split('T')[0];
+        const timeToCheck = time.split('T')[1].split(':').splice(0, 2).join(':');
+        loader.classList.remove('hide');
+
+        return confirmTime(date, timeToCheck, propertyCode).then((result) => {
+            loader.classList.add('hide');
+
+            if (result) {
+                if (result['response']) {
+                    infoBox.classList.remove('error');
+                    infoBox.innerHTML = 'Tour spot at ' + readableTime + ' requested!';
+
+                    return true;
+
+                } else {
+                    infoBox.classList.add('error');
+                    infoBox.innerHTML = 'Tour time no longer available, please try a different time';
+                    fillTimes(scheduler.getAttribute('data-current-start'))
+                    return false;
+                }
+            } else {
+                infoBox.classList.add('error');
+                infoBox.innerHTML = 'Something went wrong, please try confirming your time again';
+                return false;
+            }
+        });
+    }
+
+    function moveNextTab(currentTab) {
+        if (currentTab.nextElementSibling === null) {
+            currentTab.parentElement.firstElementChild.focus();
+        } else if (currentTab.nextElementSibling.getAttribute('disabled')) {
+            moveNextTab(currentTab.nextElementSibling);
+        } else {
+            currentTab.nextElementSibling.focus();
+        }
+    }
+
+    function movePreviousTab(currentTab) {
+        if (currentTab.previousElementElementSibling === null) {
+            currentTab.parentElement.lastElementChild.focus();
+        } else if (currentTab.previousElementSibling.getAttribute('disabled')) {
+            movePreviousTab(currentTab.previousElementSibling);
+        } else {
+            currentTab.previousElementSibling.focus();
+        }
+    }
+
+    function getNumDays(container) {
+        if (container.clientWidth === 0) {
+            numDays = getNumDays(container.parentElement);
+        } else if (container.clientWidth < 576) {
+            numDays = 3;
+        } else if (container.clientWidth < 768) {
+            numDays = 4;
+        } else if (container.clientWidth < 992) {
+            numDays = 5;
+        } else if (container.clientWidth < 1200) {
+            numDays = 6;
+        } else {
+            numDays = 7;
+        }
+
+        return numDays;
+    }
+
+    async function getTimes(startDate, days, propertyCode, hideUnavailable) {
+        let timeList;
+        let extraParams = '';
+
+        startDate = startDate.replaceAll('/', '-');
+        
+        if (hideUnavailable) {
+            extraParams += '&hide_empty=1';
+        }
+
+        try { 
+            const response = await fetch('https://api.marketapts.com/v1/schedule-a-tour/get-available?property=' + propertyCode + '&number_to_display=' + days + '&start_date=' + startDate + extraParams, {method: 'GET'});
+            timeList = await response.json();
+        } catch (e) {
+            console.error(e.message);
+            timeList = false;
+        }
+
+        return timeList;
+    }
+    async function confirmTime(date, time, propertyCode) {
+        let isAvailable;
+        try {
+            const response = await fetch('https://api.marketapts.com/v1/schedule-a-tour/is-available?is_available=' + date + '&time=' + time + '&property=' + propertyCode);
+            isAvailable = await response.json();
+        } catch (e) {
+            console.error(e.message);
+            isAvailable = false;
+        }
+
+        return isAvailable;
+    }
+}

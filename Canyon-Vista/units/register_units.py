@@ -11,6 +11,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+import posthog_client
+
 
 def load_json(path: Path) -> dict | list:
     with path.open("r", encoding="utf-8") as f:
@@ -194,6 +196,15 @@ def cmd_register(args: argparse.Namespace) -> int:
 
     Path(args.report).write_text("".join(report_lines), encoding="utf-8")
     print(f"Wrote {out_path} and {args.report}")
+    posthog_client.capture("units_registered", {
+        "property": args.property,
+        "unit_count": len(out_units),
+        "correspondences": len(src_pts),
+        "mean_residual": round(mean_res, 6),
+        "max_residual": round(max_res, 6),
+        "warning_count": len(warnings),
+    })
+    posthog_client.shutdown()
     return 0
 
 

@@ -1,0 +1,17 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canyon Vista A/B Assignment</title>
+  <script src="ab-test.js" data-sp-assign="random"></script>
+  <script>
+    const target = window.SpaceportAB.variant === "treatment" ? "variant-b.html" : "variant-a.html";
+    window.SpaceportAB.track("ab_assigned", { target });
+    window.location.replace(`${target}?sp_variant=${window.SpaceportAB.variant}&sp_visitor_id=${encodeURIComponent(window.SpaceportAB.visitorId)}&sp_session_id=${encodeURIComponent(window.SpaceportAB.sessionId)}`);
+  </script>
+</head>
+<body>
+  <p>Assigning experience...</p>
+</body>
+</html>

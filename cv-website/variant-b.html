@@ -1,0 +1,123 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Variant B | Canyon Vista 3D Treatment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dosis:wght@400;500;600;700;800&family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="ab-test.js" data-sp-variant="treatment"></script>
+</head>
+<body class="variant-b-body">
+  <header class="ab-site-header">
+    <div class="utility">
+      <div class="utility__left">
+        <span><strong>Call Today :</strong> 801-877-0254</span>
+        <span><strong>Text Today :</strong> 801-877-0254</span>
+        <span><strong>Location:</strong> 12558 S Pony Express RD Draper UT 84020</span>
+        <a href="get-directions.html">Map It</a>
+      </div>
+      <div class="utility__right">
+        <a class="utility__button" href="apartment-search.html">Apartment Search</a>
+        <a class="utility__button" href="accessible-one-page.html">ADA Page</a>
+        <a class="utility__button" href="residents.html">Residents</a>
+        <a class="utility__apply" href="apply-online.html" data-track="apply_click">Apply Today &gt;</a>
+      </div>
+    </div>
+    <div class="main-nav">
+      <a class="logo" href="index.html"><span class="logo__mark">CV</span><span class="logo__name">Canyon Vista<br>Apartments</span></a>
+      <nav class="main-nav__links" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="gallery.html">Gallery</a>
+        <a href="amenities.html">Amenities</a>
+        <a href="floorplans.html" data-track="floorplan_click">Floor Plans</a>
+        <a href="neighborhood.html">Neighborhood</a>
+        <a href="contact.html">Contact</a>
+        <a href="faq.html">FAQ</a>
+        <a class="is-cta" href="schedule-a-tour.html" data-track="schedule_tour_click">Schedule a Tour &gt;</a>
+        <a href="disclosure-fees.html">Rental Fee Disclosure</a>
+        <a href="reviews.html">Reviews</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section class="model-hero" data-model-hero>
+      <iframe src="../Canyon-Vista/index.html" title="Interactive 3D Canyon Vista property experience" loading="eager" data-model-frame></iframe>
+    </section>
+
+    <section class="section" id="details">
+      <div class="section__inner two-col">
+        <div>
+          <h2 class="section-title">Canyon Vista Draper, UT Apartments</h2>
+          <p>Welcome to Canyon Vista Apartments, where you will find the perfect apartment to start your new lifestyle in Draper, Utah. This treatment keeps the same site content as the control while placing the 3D property experience first.</p>
+          <ul class="feature-list">
+            <li>Stainless Steel Appliances</li><li>Quartz Countertops</li><li>Walk in Closets</li><li>Resort Style Swimming Pool and Spa</li><li>Luxury Clubhouse</li><li>Quick Access to I-15</li>
+          </ul>
+        </div>
+        <div class="photo-panel" style="--photo:url('assets/gallery/interior/Interior1.jpg')" aria-label="Canyon Vista apartment interior"></div>
+      </div>
+    </section>
+
+    <section class="section section--soft">
+      <div class="section__inner">
+        <h2 class="section-title">Photos of Canyon Vista Apartments</h2>
+        <p class="lead">Same gallery and leasing paths as the control variant.</p>
+        <div class="gallery-grid">
+          <a class="gallery-item" href="gallery.html" style="--photo:url('assets/gallery/interior/Interior%202.jpg')"><h3>Dining Area</h3><span>Community</span></a>
+          <a class="gallery-item" href="gallery.html" style="--photo:url('assets/gallery/interior/Interior3.jpg')"><h3>Model Living Room</h3><span>Apartment</span></a>
+          <a class="gallery-item" href="gallery.html" style="--photo:url('assets/gallery/exterior/Exterior%201.jpg')"><h3>Exterior Building</h3><span>Community</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <button class="chat-launch" type="button" data-chat-launch aria-label="Open Roxy chat">chat</button>
+  <aside class="chat-widget" data-chat-widget aria-label="Canyon Vista chat"><div class="chat-head"><span>Canyon Vista NEW</span><button class="chat-min" type="button" data-chat-min>-</button></div><div class="chat-log" data-chat-log><p class="chat-name">Roxy</p><div class="bubble">Welcome to Canyon Vista. How may I help you?</div></div><div class="chat-help"><div class="chat-help__top"><span>? Please select an option or ask a question</span><button class="chat-close" type="button" data-chat-close>x</button></div><div class="chat-options" data-chat-options></div></div><div class="chat-compose"><input aria-label="Ask Roxy" placeholder="Ask me a question..."><div class="chat-tools"><span>i &nbsp; mail</span><span>send</span></div></div><div class="chat-powered">Powered by AI. Please see our <a href="#">Privacy Statement</a>.</div></aside>
+  <script src="site.js"></script>
+  <script>
+    const startedAt = Date.now();
+    window.SpaceportAB.track("model_opened", { placement: "homepage_hero" });
+    const modelFrame = document.querySelector("[data-model-frame]");
+    function goToApply(source, label) {
+      window.SpaceportAB.track("apply_click", { source, label });
+      window.location.href = window.SpaceportAB.withTrackingParams("apply-online.html");
+    }
+    modelFrame.addEventListener("load", () => {
+      try {
+        const doc = modelFrame.contentDocument;
+        if (!doc) return;
+        doc.addEventListener("click", (event) => {
+          const target = event.target.closest("button, a, [role='button'], [id], [class]");
+          if (!target) return;
+          const text = (target.textContent || target.id || target.className || "").toString().trim().replace(/\s+/g, " ").slice(0, 120);
+          if (/apply/i.test(text)) {
+            event.preventDefault();
+            event.stopPropagation();
+            goToApply("iframe", text || "Apply Now");
+            return;
+          }
+          if (/unit|apartment|available/i.test(text)) window.SpaceportAB.track("unit_clicked", { source: "iframe", label: text });
+          if (/floor|level/i.test(text)) window.SpaceportAB.track("floor_changed", { source: "iframe", label: text });
+          if (/pool|playground|courtyard|amenity|clubhouse|fitness/i.test(text)) window.SpaceportAB.track("amenity_clicked", { source: "iframe", label: text });
+        }, true);
+        doc.addEventListener("mouseover", (event) => {
+          const target = event.target.closest("[id], [class], button, a");
+          if (!target) return;
+          const text = (target.textContent || target.id || target.className || "").toString().trim().replace(/\s+/g, " ").slice(0, 120);
+          if (/unit|apartment/i.test(text)) window.SpaceportAB.track("unit_hovered", { source: "iframe", label: text });
+        }, true);
+      } catch (error) {
+        window.SpaceportAB.track("model_iframe_bridge_unavailable", { message: error.message });
+      }
+    });
+    window.addEventListener("beforeunload", () => {
+      window.SpaceportAB.track("model_time_spent", {
+        seconds: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+        placement: "homepage_hero"
+      });
+    });
+  </script>
+</body>
+</html>

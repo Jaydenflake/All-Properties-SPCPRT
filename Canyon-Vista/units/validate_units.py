@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import posthog_client
+
 MIN_AREA = 0.0001
 
 
@@ -58,8 +60,12 @@ def main() -> int:
 
     if errors:
         print("\n".join(errors), file=sys.stderr)
+        posthog_client.capture("units_validated", {"success": False, "error_count": len(errors), "unit_count": len(units)})
+        posthog_client.shutdown()
         return 1
     print(f"OK: {len(units)} units validated")
+    posthog_client.capture("units_validated", {"success": True, "unit_count": len(units)})
+    posthog_client.shutdown()
     return 0
 
 

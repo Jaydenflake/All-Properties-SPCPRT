@@ -14,6 +14,8 @@ import json
 import sys
 from pathlib import Path
 
+import posthog_client
+
 
 def load_json(path: Path) -> dict | list:
     with path.open("r", encoding="utf-8") as f:
@@ -290,6 +292,8 @@ def cmd_segment(args: argparse.Namespace) -> int:
     }
     save_json(out_path, payload)
     print(f"Wrote {len(units_raw)} units to {out_path}")
+    posthog_client.capture("units_segmented", {"unit_count": len(units_raw), "image_width": iw, "image_height": ih})
+    posthog_client.shutdown()
     return 0
 
 
@@ -329,6 +333,8 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     cv2.imwrite(str(out_img), bgr)
     print(f"Wrote {out_img}")
+    posthog_client.capture("units_previewed", {"unit_count": len(units)})
+    posthog_client.shutdown()
     return 0
 
 

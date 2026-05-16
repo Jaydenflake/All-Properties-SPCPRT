@@ -1,0 +1,16 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Variant A | Canyon Vista Control</title>
+  <script src="ab-test.js" data-sp-variant="control"></script>
+  <script>
+    window.SpaceportAB.track("variant_entry", { forced_variant: "control" });
+    window.location.replace(window.SpaceportAB.withTrackingParams("index.html"));
+  </script>
+</head>
+<body>
+  <p>Loading control experience...</p>
+</body>
+</html>

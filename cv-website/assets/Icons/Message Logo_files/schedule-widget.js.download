@@ -1,0 +1,2342 @@
+class ScheduleWidget extends HTMLElement {
+  static observedAttributes = ["data-fname", "data-lname", "data-email", "data-phone", "data-moveindate", "data-schedule-widget-time", "data-current-slide", "data-property-code", "data-max-days", "data-start-delay"];
+
+  constructor() {
+    super();
+    this.scheduleShadow = this.attachShadow({mode: "open"});
+    this.siteKey = '6Lf2JxIpAAAAAGoik6aQ2QnIYVl8zVOrTGVu4Qjf';
+  }
+
+  connectedCallback() {
+    const schedulePopup = this;
+    const captchaStyle = document.createElement('style');
+    let scheduleBtn;
+
+    captchaStyle.innerHTML = '.grecaptcha-badge { visibility: hidden; }';
+    document.body.appendChild(captchaStyle);
+
+    this.scheduleShadow.innerHTML = `
+    <link rel="stylesheet" href="https://www.marketapts.com/css/schedule.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@500&display=swap');
+
+        .modal {
+          font-family: 'Open Sans', sans-serif;
+          white-space: normal;
+          display: none;
+          position: fixed;
+          z-index: 100000000;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
+          background-color: rgb(0,0,0);
+          background-color: rgba(0,0,0,0.4);
+        }
+
+        .close {
+          color: white;
+          background: none;
+          border: none;
+          vertical-align: middle;
+          padding: 10px 18px;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+          color: #aaa;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2px 16px;
+          background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+          color: white;
+          overflow-x: hidden;
+          overflow-y: auto;
+        }
+        .modal-body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* Modal Content */
+        .modal-content {
+          position: relative;
+          overflow-x: hidden;
+          overflow-y: auto;
+          top: 5%;
+          left: 0;
+          right: 0;
+          margin: 5% auto;
+          background-color: #fefefe;
+          padding: 0;
+          border: 1px solid #888;
+          border-radius: 10px;
+          width: 80%;
+          max-width: 700px;
+          box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+          animation-name: animatetop;
+          animation-duration: 0.4s
+        }
+
+        /* Add Animation */
+        @keyframes animatetop {
+          from {top: -300px; opacity: 0}
+          to {top: 0; opacity: 1}
+        }
+        h2 {
+            font-weight: bold;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        h3 {
+            color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-size: 18px;
+            margin: 10px 0;
+            width: 100%;
+            white-space: normal;
+        }
+        .slides {
+            position:relative;
+            width: 100%;
+            right: 0%;
+            font-size: 0;
+            display:inline-block;
+            white-space: nowrap;
+            transition: right 0.3s ease-in;
+        }
+        .slide {
+            display:inline-block;
+            overflow-x: hidden;
+            overflow-y: auto;
+            vertical-align: top;
+            width:100%;
+            position: relative;
+            text-align: center;
+            font-size: 16px;
+        }
+        .slide-window {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 15px;
+            padding-top: 0;
+            white-space: normal;
+        }
+        .widget-label {
+            display: block;
+            text-align: start;
+            margin: 15px 0;
+            box-sizing: border-box;
+            color: #555;
+        }
+        .widget-label span {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .widget-label input {
+            display: block;
+            font-family: 'Open Sans', sans-serif;
+            color: #333;
+            box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+            box-sizing: border-box;
+            border-radius: 4px;
+            padding: 10px 5px;
+            border: 1px solid #ccc;
+            width: 100%;
+        }
+        .widget-label input[type="date"] {
+            display:block;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            min-height: 40px;
+            min-width: 100%;
+        }
+        .widget-label input:focus {
+            outline: none;
+            box-shadow: 0px 0px 2px 2px ${this.getAttribute('data-color') ?? '#264ec1'};
+            border-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+        }
+        .widget-label input:autofill {
+            background-color: white!important;
+            color: #333!important;
+        }
+        .schedule-times-field {
+            margin:0;
+            padding:0;
+        }
+        .schedule-times-field legend {
+            display: block;
+            width: 100%;
+            padding: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: inherit;
+            color: #222;
+            border: 0;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .schedule-times {
+            padding: 5px 20px;
+        }
+        .date-holder {
+            padding: 5px;
+        }
+        .hider {
+            margin: 10px;
+            margin-bottom: 0px;
+        }
+        .scheduler {
+            min-height: 350px;
+            margin: 0;
+        }
+        .schedule-controls,
+        .hider,
+        .schedule-time-button,
+        .schedule-date {
+            font-weight: 700;
+            color: #333;
+            background-color: #eee;
+            border-color: #ccc;
+        }
+        .schedule-panel {
+            border: 1px solid #ccc!important;
+        }
+        .schedule-controls,
+        .hider,
+        .schedule-time-button {
+            border-radius: 2px;
+        }
+        .schedule-date:first-child {
+            border-top-left-radius: 2px;
+            border-bottom-left-radius: 2px;
+        }
+        .schedule-date:last-child {
+            border-top-right-radius: 2px;
+            border-bottom-right-radius: 2px;
+        }
+        .schedule-date {
+            cursor: pointer;
+        }
+        .schedule-date.disabled {
+            cursor: default;
+        }
+        .schedule-time-button {
+            margin: 5px;
+            padding: 5px;
+            font-size:18px;
+        }
+        .schedule-time-button input {
+            margin: 0;
+        }
+        #scheduler {
+            padding: 10px!important;
+        }
+        .widget-info-list {
+            text-align: left;
+            list-style-type: none;
+            padding: 0;
+        }
+        .widget-info-list li {
+            display: flex;
+            justify-content: space-between;
+            color: #555;
+            margin: 15px 5px;
+        }
+        .widget-info-list li span {
+            text-align: right;
+            color: #333;
+        }
+        .widget-info-list li span:not(:empty):first-child {
+            padding-left: 10px;
+        }
+        .info-box {
+            max-height: 50px;
+            margin: 0;
+            margin-top: 10px;
+            margin-left: 5px;
+            padding: 0;
+            width: 100%;
+            line-height: 1;
+            text-align: center;
+            font-weight: bold;
+            color: #555;
+        }
+        .slide-button {
+            display: flex;
+            padding: 10px;
+            cursor: pointer;
+            color: white;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            border: 0;
+            border-radius: 2px;
+            font-weight: bold;
+            justify-content: space-between;
+            align-items: center;
+            width: 100px;
+        }
+        #widget-submit[disabled],
+        .slide-button[disabled] {
+            cursor: default;
+            opacity: 0.5;
+        }
+        #widget-submit {
+            cursor: pointer;
+            padding: 10px;
+            margin: 15px 0;
+            color: white;
+            border: 0;
+            border-radius: 2px;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-weight: bold;
+        }
+        .verify-loader {
+            display: block;
+            width: 100%;
+        }
+        .verify-loader img {
+            height: 75px;
+            width: auto;
+            margin: 0 auto;
+        }
+        .schedule-date.active, .schedule-time-button.active {
+            color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            border: 1px solid ${this.getAttribute('data-color') ?? '#264ec1'};
+        }
+        .schedule-time-button input {
+            accent-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+        }
+        .schedule-date.active {
+            border-top: 3px solid ${this.getAttribute('data-color') ?? '#264ec1'};
+        }
+        .captcha-text {
+            opacity: 0.7;
+            size: 10px!important;
+        }
+        @media screen and (max-width: 767px) {
+            .schedule-time-button {
+                margin: 3px;
+                padding: 5px;
+                font-size:14px;
+            }
+        }
+        @media screen and (max-width: 374px) {
+            .schedule-date,
+            .schedule-time-button {
+                font-size:12px;
+                font-weight: 600;
+            }
+            .schedule-time-button input {
+                width: 11px;
+            }
+        }
+    </style>
+
+    <div id="myModal" class="modal" tabindex="-1" role="dialog" aria-labelledby="schedule-widget-title">
+
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="schedule-widget-title">Schedule a Tour</h2>
+            <button class="close" aria-label="Close Schedule Modal" style="border:none;background:none;">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div style="display:flex;justify-content:space-between;padding:15px 15px 0;">
+                <button type="button" class="slide-button slide-left" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" class="bi bi-chevron-left" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                    </svg>
+                    <span>Previous</span>
+                </button>
+                <button type="button" class="slide-button slide-right">
+                    <span>Next</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" class="bi bi-chevron-right" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                </button>
+            </div>
+            <form aria-labelledby="schedule-widget-title" method="post" action="https://api.marketapts.com/v1/schedule-a-tour/insert-tour" class="slides">
+                <div id="slide0" data-slide-number="0" class="slide">
+                    <div class="slide-window">
+                        <h3 style="margin-bottom:10px">Let us Know When You'd Like to Visit</h3>
+                        <div
+                            id="widget-scheduler"
+                            data-max-days="${this.getAttribute('data-max-days') ?? 60}"
+                            data-property-code="${this.getAttribute('data-property-code')}"
+                            data-start-delay="${this.getAttribute('data-start-delay') ?? 0}"
+                            data-input-name="schedule-widget-time"
+                            data-info-id="widget-scheduler-info"
+                        >
+                        </div>
+                    </div>
+                </div>
+                <div id="slide1" data-slide-number="1" class="slide">
+                    <div class="slide-window">
+                        <h3>Now Tell Us Some Information About Yourself</h3>
+                        <input type="hidden" name="session_id">
+                        <label class="widget-label">
+                            <span>First Name: </span>
+                            <input type="text" name="fname" required>
+                        </label>
+                        <label class="widget-label">
+                            <span>Last Name: </span>
+                            <input type="text" name="lname" required>
+                        </label>
+                        <label class="widget-label">
+                            <span>Email: </span>
+                            <input type="email" name="email" required>
+                        </label>
+                        <label class="widget-label">
+                            <span>Phone: </span>
+                            <input type="tel" name="phone" required>
+                        </label>
+                        <label class="widget-label">
+                            <span>Move In Date: </span>
+                            <input type="date" name="moveindate" required>
+                        </label>
+                        <input type="hidden" name="propertycode" value="${this.getAttribute('data-property-code')}">
+                    </div>
+                </div>
+                <div id="slide2" data-slide-number="2" class="slide">
+                    <div class="slide-window">
+                        <h3>Let's Review Your Information</h3>
+                        <div>
+                            <ul class="widget-info-list">
+                                <li>Name: <div style="display:inline-block;"><span id="info-fname"></span> <span id="info-lname"></span></div></li>
+                                <li>Email: <span id="info-email"></span></li>
+                                <li>Phone Number: <span id="info-phone"></span></li>
+                                <li>Move In Date: <span id="info-moveindate"></span></li>
+                                <li>Tour Date and Time: <span id="info-schedule-widget-time"></span></li>
+                            </ul>
+                        </div>
+                        <div class="info-box">All tours are pending until confirmed by the leasing team</div>
+                        <div class="info-box" id='widget-scheduler-info' aria-live="polite"></div>
+                        <div class="info-box" id='widget-info' aria-live="polite"></div>
+                        ${this.getAttribute('data-is-55') == 1 ? '<div class="info-box">By submitting, you confirm you are 55 years of age or older, or submitting on behalf of someone who is 55 years of age or older.</div>' : ''}
+                        <input id="widget-submit" type="submit" value="Looks Good, Schedule My Tour">
+                        <div class="captcha-text">
+                            This site is protected by reCAPTCHA and the Google
+                            <a href="https://policies.google.com/privacy">Privacy Policy</a> and
+                            <a href="https://policies.google.com/terms">Terms of Service</a> apply.
+                        </div>
+                    </div>
+                </div>
+            </form>
+          </div>
+        </div>
+    </div>
+    `;
+
+    const modal = this.scheduleShadow.querySelector('.modal');
+    const input = this.scheduleShadow.querySelector('.widget-label input[type="date"]');
+    const slides = this.scheduleShadow.querySelectorAll('.slide');
+
+    // Manually change focus on tab to prevent modal from shifting
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Tab' && !event.shiftKey) {
+            event.preventDefault();
+            schedulePopup.setAttribute('data-current-slide', 2);
+            setTimeout(() => {
+                this.scheduleShadow.querySelector('#widget-submit').focus();
+            }, 400);
+        }
+    });
+
+    this.scheduleShadow.querySelector('form').onchange = (event) => {
+        let setValue;
+
+        if(event.target.getAttribute('name') === 'schedule-widget-time') {
+            setValue = event.target.getAttribute('data-date-time');
+        } else if (event.target.getAttribute('name') === 'moveindate') {
+            setValue = new Date(event.target.value.replaceAll('-', '/'))
+                .toLocaleDateString(undefined,
+                    {month: 'short', day: 'numeric', year: 'numeric'}
+                );
+        } else {
+            setValue = event.target.value;
+        }
+
+        schedulePopup.setAttribute(
+            'data-' + event.target.getAttribute('name'),
+            setValue
+        );
+    };
+
+    //Remove schedule date from confirmation when input removed
+    new MutationObserver((mutationList, observer) => {
+        schedulePopup.setAttribute('data-schedule-widget-time', '');
+    }).observe(
+        this.scheduleShadow.querySelector('#widget-scheduler'),
+        { 'subtree': true, 'childList': true }
+    );
+
+    this.scheduleShadow.querySelector('form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const submit = this.scheduleShadow.querySelector('#widget-submit');
+        const loader = document.createElement('div');
+        const info = this.scheduleShadow.querySelector('#widget-info');
+        const scheduleInfo = this.scheduleShadow.querySelector('#widget-scheduler-info');
+
+        scheduleInfo.style.display = 'block';
+        submit.setAttribute('disabled', true);
+        loader.classList.add('verify-loader');
+        loader.innerHTML = '<img src="https://www.marketapts.com/img/03-42-05-37_512.gif" alt="loading">';
+        submit.after(loader);
+
+        //Make sure captcha is loaded and ready
+        if (typeof grecaptcha !== 'undefined') {
+            grecaptcha.ready(() => {
+                grecaptcha.execute('6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw', {action: 'submit'}).then((token) => {
+                    console.log('verifying');
+                    const form = this.scheduleShadow.querySelector('form');
+                    const tourInfo = new FormData(form, submit)
+                    const date = tourInfo.get('schedule-widget-time').split('T')[0];
+                    const time = tourInfo.get('schedule-widget-time').split('T')[1].split(':').splice(0, 2).join(':');
+                    tourInfo.append('g-recaptcha-response', token);
+
+                    //Check for valid dates
+                    if (new Date() > new Date(tourInfo.get('moveindate'))) {
+                        loader.remove();
+                        scheduleInfo.style.display = 'none';
+                        submit.removeAttribute('disabled');
+                        info.textContent = 'Invalid move in date, please select a date in the future';
+                    } else if (new Date(date) > new Date(tourInfo.get('moveindate'))) {
+                        loader.remove();
+                        scheduleInfo.style.display = 'none';
+                        submit.removeAttribute('disabled');
+                        info.textContent = 'Invalid move in date, please ensure the move in date is after the requested tour time';
+                    } else {
+
+                        //Check tour date still available
+                        fetch('https://api.marketapts.com/v1/schedule-a-tour/is-available?is_available=' + date + '&time=' + time + '&property=' + tourInfo.get('propertycode'))
+                        .then((result) => {
+                            result.json().then((confirmResults) => {
+                                if (confirmResults && confirmResults['response']) {
+                                    //Submit form data
+                                    fetch('https://api.marketapts.com/v1/schedule-a-tour/insert-tour', {
+                                        'method': 'POST',
+                                        'body': tourInfo
+                                    }).then((response) => {
+                                        loader.remove();
+                                        if (response.status == 200) {
+                                            form.querySelectorAll('input').forEach((input) => {
+                                                input.setAttribute("disabled", true);
+                                            });
+                                            info.textContent = 'We\'ll be reaching out to verify your tour soon.';
+                                            submit.setAttribute('disabled', true);
+                                        } else {
+                                            info.textContent = 'Something went wrong, please try submitting again';
+                                            submit.removeAttribute('disabled');
+                                        }
+                                    }).catch((error) => {
+                                        submit.removeAttribute('disabled');
+                                        loader.remove();
+                                        console.error(error);
+                                        info.textContent = 'Something went wrong, please try submitting again';
+                                    });
+                                } else {
+                                    loader.remove();
+                                    submit.removeAttribute('disabled');
+                                    info.textContent = '';
+                                }
+                            });
+                        }).catch((e) => {
+                            loader.remove();
+                            submit.removeAttribute('disabled');
+                            info.textContent = 'Something went wrong, please try submitting again';
+                        });
+                    }
+                });
+            });
+        } else {
+            info.textContent = 'Something went wrong, please wait a moment and try submitting again';
+            loader.remove();
+            submit.removeAttribute('disabled');
+        }
+    });
+
+    //Add default widget button if doesn't exit
+    if (!document.getElementById(schedulePopup.getAttribute('data-button'))) {
+        scheduleBtn = document.createElement('aside');
+        scheduleBtn.setAttribute('aria-labelledby', schedulePopup.getAttribute('data-button'));
+        scheduleBtn.innerHTML = `
+          <button id="${schedulePopup.getAttribute('data-button')}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-calendar-fill" viewBox="0 0 16 16">
+              <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5h16V4H0V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5z"/>
+            </svg>
+            <span> ${schedulePopup.getAttribute('data-btn-text') ?? 'Book a Tour'}</span>
+          </button>
+
+          <style>
+            #${schedulePopup.getAttribute('data-button')} {
+                font-family: 'Open Sans', sans-serif;
+                display: inline-block;
+                border: 1px solid white!important;
+                border-radius: 2px;
+                background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+                color: white;
+                font-weight: bold;
+                font-size: 24px;
+                padding: 10px;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 9000;
+                ${this.getAttribute('data-css') ?? ''}
+                ${(typeof mktAptsSchWidgetCss === 'undefined') ? '' : mktAptsSchWidgetCss}
+            }
+            @media screen and (max-width: 767px) {
+                #${schedulePopup.getAttribute('data-button')} {
+                    ${this.getAttribute('data-sm-css') ?? ''}
+                    ${(typeof mktAptsSchWidgetCssSm === 'undefined') ? '' : mktAptsSchWidgetCssSm}
+                }
+            }
+          </style>
+        `;
+        document.body.appendChild(scheduleBtn);
+    } else {
+        scheduleBtn = document.getElementById(schedulePopup.getAttribute('data-button'));
+    }
+
+    scheduleBtn.addEventListener('click', () => {
+        modal.style.display = "block";
+
+        //Render captcha
+        if (!document.querySelector('script[src="https://www.google.com/recaptcha/api.js?render=6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw"]')) {
+            const captchaSrc = document.createElement('script');
+            captchaSrc.setAttribute('src', 'https://www.google.com/recaptcha/api.js?render=6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw');
+            document.body.appendChild(captchaSrc);
+        }
+    });
+
+    scheduleBtn.addEventListener('click', () => {
+        setTimeout(() => {
+            addScheduler('#widget-scheduler', this.scheduleShadow);
+
+            //Add session id from g analytics
+            const s_ids = this.scheduleShadow.querySelectorAll('[name="session_id"]');
+            if (s_ids.length) {
+              for (var i = 0; i < s_ids.length; i += 1) {
+                if (typeof getSessionData !== 'undefined') {
+                  getSessionData(function(data) {
+                    s_ids[i].value = data.ga_session_id;
+                  });
+                }
+              }
+            }
+
+            //Move focus to modal
+            this.scheduleShadow.querySelector('.modal').focus();
+
+            // Manually change focus on tab to prevent modal from shifting
+            this.scheduleShadow.querySelector('.time-holder').addEventListener('keydown', (event) => {
+                if (event.key === 'Tab' && !event.shiftKey) {
+                    event.preventDefault();
+                    schedulePopup.setAttribute('data-current-slide', 1);
+                    setTimeout(() => {
+                        this.scheduleShadow.querySelector('.widget-label input').focus();
+                    }, 400);
+                }
+            });
+
+        }, 500)
+    }, {once: true})
+
+    this.scheduleShadow.querySelector('.slide-right').addEventListener('click', () => {
+        let newSlideNumber;
+
+        if (schedulePopup.getAttribute('data-current-slide') === null) {
+            newSlideNumber = 1;
+        } else {
+            newSlideNumber = parseInt(schedulePopup.getAttribute('data-current-slide')) + 1;
+        }
+
+        if (modal.querySelector('#slide' + newSlideNumber)) {
+            schedulePopup.setAttribute('data-current-slide', newSlideNumber);
+        }
+    });
+
+    this.scheduleShadow.querySelector('.slide-left').addEventListener('click', () => {
+        const newSlideNumber = parseInt(schedulePopup.getAttribute('data-current-slide')) - 1;
+
+        if (modal.querySelector('#slide' + newSlideNumber)) {
+            schedulePopup.setAttribute('data-current-slide', newSlideNumber);
+        }
+    });
+
+    this.scheduleShadow.querySelector(".close").onclick = function() {
+      modal.style.display = "none";
+    }
+
+    for (let i = 0; i < slides.length; i++) {
+        slides[i].addEventListener('focusin', (event) => {
+            schedulePopup.setAttribute('data-current-slide', slides[i].getAttribute('data-slide-number'));
+        });
+    }
+
+    modal.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+
+    if (name === 'data-current-slide') {
+        if (this.scheduleShadow.querySelector('.slides')) {
+            if (newValue === null || parseInt(newValue) === 0) {
+                this.scheduleShadow.querySelector('.slide-left').setAttribute('disabled', true);
+                this.scheduleShadow.querySelector('.slide-right').removeAttribute('disabled');
+            } else if (!this.scheduleShadow.querySelector('#slide' + (parseInt(newValue) + 1))) {
+                this.scheduleShadow.querySelector('.slide-right').setAttribute('disabled', true);
+                this.scheduleShadow.querySelector('.slide-left').removeAttribute('disabled');
+            } else {
+                this.scheduleShadow.querySelector('.slide-left').removeAttribute('disabled');
+                this.scheduleShadow.querySelector('.slide-right').removeAttribute('disabled');
+            }
+
+            this.scheduleShadow.querySelector('.slides').style.right = (100 * parseInt(newValue)) + '%';
+        }
+    } else {
+        const infoTarget = this.scheduleShadow.querySelector('#' + name.replace('data-', 'info-'));
+        if (infoTarget) {
+            infoTarget.textContent = newValue;
+        }
+    }
+  }
+}
+
+class PhotoWidget extends HTMLElement {
+  static observedAttributes = ["data-current-slide", "data-property-code"];
+  photosLoaded = 0;
+
+  constructor() {
+    super();
+    this.attachShadow({mode: "open"});
+  }
+
+  connectedCallback() {
+    const photoPopup = this;
+    let photoBtn;
+
+    this.shadowRoot.innerHTML = `
+    <link rel="stylesheet" href="https://www.marketapts.com/css/schedule.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@500&display=swap');
+
+        .modal {
+          font-family: 'Open Sans', sans-serif;
+          white-space: normal;
+          display: none;
+          position: fixed;
+          z-index: 100000000;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
+          background-color: rgb(0,0,0);
+          background-color: rgba(0,0,0,0.4);
+        }
+
+        .close {
+          color: white;
+          background: none;
+          border: none;
+          vertical-align: middle;
+          padding: 10px 18px;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+          color: #aaa;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2px 16px;
+          background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+          color: white;
+          overflow-x: hidden;
+          overflow-y: auto;
+        }
+        .modal-body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* Modal Content */
+        .modal-content {
+          position: relative;
+          overflow-x: hidden;
+          overflow-y: auto;
+          left: 0;
+          right: 0;
+          margin: 5% auto;
+          background-color: #fefefe;
+          background-image: url("https://www.marketapts.com/img/03-42-05-37_512.gif");
+          background-position: center;
+          background-repeat: no-repeat;
+          background-size: 30%;
+          padding: 0;
+          border: 1px solid #888;
+          border-radius: 10px;
+          width: 90%;
+          max-width: 800px;
+          box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+          animation-name: animatetop;
+          animation-duration: 0.4s
+        }
+
+        /* Add Animation */
+        @keyframes animatetop {
+          from {top: -300px; opacity: 0}
+          to {top: 0; opacity: 1}
+        }
+        h2 {
+            font-weight: bold;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        h3 {
+            color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-size: 18px;
+            margin: 10px 0;
+            width: 100%;
+            white-space: normal;
+        }
+        .slides {
+            position:relative;
+            width: 100%;
+            right: 0%;
+            font-size: 0;
+            display:inline-block;
+            white-space: nowrap;
+            transition: right 0.3s ease-in;
+        }
+        .slide {
+            display:inline-block;
+            overflow-x: hidden;
+            overflow-y: auto;
+            vertical-align: top;
+            width:100%;
+            position: relative;
+            text-align: center;
+            font-size: 16px;
+        }
+        .slide-window {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            white-space: normal;
+        }
+        .slide-button {
+            display: flex;
+            padding: 10px;
+            cursor: pointer;
+            color: white;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            border: 0;
+            border-radius: 2px;
+            font-weight: bold;
+            justify-content: space-between;
+            align-items: center;
+            width: 100px;
+        }
+        .slide-button[disabled] {
+            cursor: default;
+            opacity: 0.5;
+        }
+        .loader {
+            width: 100%;
+            max-height: 75vh;
+            aspect-ratio: 4/3;
+        }
+        .widget-photo {
+            max-width: 100%;
+            max-height: 85vh;
+            width: auto;
+            height: auto;
+            aspect-ratio: 4/3;
+        }
+        figure {
+            margin: 0;
+        }
+        figcaption {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            margin: 0 auto;
+            text-align: center;
+            white-space: normal;
+        }
+    </style>
+
+    <div id="myModal" class="modal" tabindex="-1" role="dialog" aria-labelledby="photo-widget-title">
+
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="photo-widget-title">Photos</h2>
+            <button class="close" aria-label="Close Photo Modal" style="border:none;background:none;">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div style="display:flex;justify-content:space-between;padding:15px 15px 0;">
+                <button type="button" class="slide-button slide-left" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" class="bi bi-chevron-left" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                    </svg>
+                    <span>Previous</span>
+                </button>
+                <button type="button" class="slide-button slide-right">
+                    <span>Next</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" class="bi bi-chevron-right" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="slides">
+                <div id="slide0" data-slide-number="0" class="slide">
+                    <div class="slide-window">
+                        <div class="loader">Loading...</div>
+                    </div>
+                </div>
+            </div>
+          </div>
+        </div>
+    </div>
+    `;
+
+    const modal = this.shadowRoot.querySelector('.modal');
+    const slideHolder = this.shadowRoot.querySelector('.slides');
+    const slides = this.shadowRoot.querySelectorAll('.slide');
+
+    let touchstartX = 0
+    let touchendX = 0
+
+    //Add default widget button if doesn't exit
+    if (!document.getElementById(this.getAttribute('data-button'))) {
+        photoBtn = document.createElement('aside');
+        photoBtn.setAttribute('aria-labelledby', this.getAttribute('data-button'));
+        photoBtn.innerHTML = `
+          <button id="${this.getAttribute('data-button')}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-images" viewBox="0 0 16 16">
+              <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/>
+              <path d="M14.002 13a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2V5A2 2 0 0 1 2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-1.998 2M14 2H4a1 1 0 0 0-1 1h9.002a2 2 0 0 1 2 2v7A1 1 0 0 0 15 11V3a1 1 0 0 0-1-1M2.002 4a1 1 0 0 0-1 1v8l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71a.5.5 0 0 1 .577-.094l1.777 1.947V5a1 1 0 0 0-1-1z"/>
+            </svg>
+            <span> ${this.getAttribute('data-btn-text') ?? 'View Photos'}</span>
+          </button>
+
+          <style>
+            #${this.getAttribute('data-button')} {
+                font-family: 'Open Sans', sans-serif;
+                display: inline-block;
+                border: 1px solid white!important;
+                border-radius: 2px;
+                background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+                color: white;
+                font-weight: bold;
+                font-size: 24px;
+                padding: 10px;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 9000;
+                ${this.getAttribute('data-css') ?? ''}
+            }
+            @media screen and (max-width: 767px) {
+                #${this.getAttribute('data-button')} {
+                    ${this.getAttribute('data-sm-css') ?? ''}
+                }
+            }
+          </style>
+        `;
+        document.body.appendChild(photoBtn);
+    } else {
+        photoBtn = document.getElementById(this.getAttribute('data-button'));
+    }
+
+    photoBtn.addEventListener('click', () => {
+        modal.style.display = "block";
+
+        if (!this.photosLoaded) {
+            fetch("https://api.marketapts.com/v1/property-photo?property=" + this.getAttribute('data-property-code'), { method: 'GET' })
+            .then(response => response.json())
+            .then((results) => {
+                this.photosLoaded = 1;
+                let photoSlide;
+
+                for (let i = 0; i < results.length; i++) {
+
+                    if (this.shadowRoot.querySelector('#slide' + i.toString())) {
+                        photoSlide = this.shadowRoot.querySelector('#slide' + i.toString());
+                    } else {
+                        photoSlide = document.createElement('div');
+                        photoSlide.id = 'slide' + i.toString();
+                        photoSlide.setAttribute('data-slide-number', i);
+                        photoSlide.classList.add('slide');
+                        slideHolder.appendChild(photoSlide);
+                    }
+
+                    photoSlide.innerHTML = `
+                        <figure>
+                            <img
+                                class="widget-photo"
+                                width="800"
+                                height="600"
+                                ${i <= 1 ? '' : 'data-'}src="${results[i].image.replace('//images', '/' + this.getAttribute('data-property-code') + '/images')}"
+                                alt="${results[i].name}"
+                            >
+                            <figcaption>${results[i].name}</figcaption>
+                        </figure>
+                    `;
+                }
+            });
+        }
+    });
+
+    function moveRight() {
+        let newSlideNumber;
+
+        if (photoPopup.getAttribute('data-current-slide') === null) {
+            newSlideNumber = 1;
+        } else {
+            newSlideNumber = parseInt(photoPopup.getAttribute('data-current-slide')) + 1;
+        }
+
+        if (modal.querySelector('#slide' + newSlideNumber)) {
+            photoPopup.setAttribute('data-current-slide', newSlideNumber);
+        }
+    }
+
+    function moveLeft() {
+        const newSlideNumber = parseInt(photoPopup.getAttribute('data-current-slide')) - 1;
+
+        if (modal.querySelector('#slide' + newSlideNumber)) {
+            photoPopup.setAttribute('data-current-slide', newSlideNumber);
+        }
+    }
+
+    function checkDirection() {
+      if (touchendX + 80  < touchstartX) {
+        moveRight();
+      } else if (touchendX > touchstartX + 80) {
+        moveLeft();
+      }
+    };
+
+    this.shadowRoot.querySelector('.slide-right').addEventListener('click', () => {
+        moveRight();
+    });
+
+    this.shadowRoot.querySelector('.slide-left').addEventListener('click', () => {
+        moveLeft();
+    });
+
+    slideHolder.addEventListener('touchstart', e => {
+      touchstartX = e.changedTouches[0].screenX;
+    });
+
+    slideHolder.addEventListener('touchend', e => {
+      touchendX = e.changedTouches[0].screenX;
+      checkDirection();
+    });
+
+    this.shadowRoot.querySelector(".close").onclick = function() {
+      modal.style.display = "none";
+    }
+
+    for (let i = 0; i < slides.length; i++) {
+        slides[i].addEventListener('focusin', (event) => {
+            photoPopup.setAttribute('data-current-slide', slides[i].getAttribute('data-slide-number'));
+        });
+    }
+
+    photoBtn.addEventListener('click', () => {
+        setTimeout(() => {
+            //Move focus to modal
+            this.shadowRoot.querySelector('.modal').focus();
+        }, 500)
+    }, {once: true})
+
+    modal.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+
+  }
+
+  loadPhoto(photoSlide) {
+    const photo = photoSlide.querySelector('img');
+    if (photo.getAttribute('data-src')) {
+        photo.setAttribute('src', photo.getAttribute('data-src'));
+        photo.removeAttribute('data-src');
+    }
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+
+    if (name === 'data-current-slide') {
+        if (this.shadowRoot.querySelector('.slides')) {
+            if (newValue === null || parseInt(newValue) === 0) {
+                this.shadowRoot.querySelector('.slide-left').setAttribute('disabled', true);
+                this.shadowRoot.querySelector('.slide-right').removeAttribute('disabled');
+            } else if (!this.shadowRoot.querySelector('#slide' + (parseInt(newValue) + 1))) {
+                this.shadowRoot.querySelector('.slide-right').setAttribute('disabled', true);
+                this.shadowRoot.querySelector('.slide-left').removeAttribute('disabled');
+            } else {
+                this.loadPhoto(this.shadowRoot.querySelector('#slide' + (parseInt(newValue) + 1)));
+                this.shadowRoot.querySelector('.slide-left').removeAttribute('disabled');
+                this.shadowRoot.querySelector('.slide-right').removeAttribute('disabled');
+            }
+
+            this.shadowRoot.querySelector('.slides').style.right = (100 * parseInt(newValue)) + '%';
+        }
+    }
+  }
+}
+
+class ContactWidget extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({mode: "open"});
+    this.siteKey = '6Lf2JxIpAAAAAGoik6aQ2QnIYVl8zVOrTGVu4Qjf';
+  }
+
+  connectedCallback() {
+    const contactPopup = this;
+    const captchaStyle = document.createElement('style');
+    let contactBtn;
+
+    captchaStyle.innerHTML = '.grecaptcha-badge { visibility: hidden; }';
+    document.body.appendChild(captchaStyle);
+
+    this.shadowRoot.innerHTML = `
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@500&display=swap');
+
+        .modal {
+          font-family: 'Open Sans', sans-serif;
+          white-space: normal;
+          display: none;
+          position: fixed;
+          z-index: 100000000;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
+          background-color: rgb(0,0,0);
+          background-color: rgba(0,0,0,0.4);
+        }
+
+        .close {
+          color: white;
+          background: none;
+          border: none;
+          vertical-align: middle;
+          padding: 10px 18px;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+          color: #aaa;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2px 16px;
+          background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+          color: white;
+          overflow-x: hidden;
+          overflow-y: auto;
+        }
+        .modal-body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* Modal Content */
+        .modal-content {
+          position: relative;
+          overflow-x: hidden;
+          overflow-y: auto;
+          top: 5%;
+          left: 0;
+          right: 0;
+          margin: 5% auto;
+          background-color: #fefefe;
+          padding: 0;
+          border: 1px solid #888;
+          border-radius: 10px;
+          width: 80%;
+          max-width: 700px;
+          box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+          animation-name: animatetop;
+          animation-duration: 0.4s
+        }
+
+        /* Add Animation */
+        @keyframes animatetop {
+          from {top: -300px; opacity: 0}
+          to {top: 0; opacity: 1}
+        }
+        h2 {
+            font-weight: bold;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        h3 {
+            color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-size: 18px;
+            margin: 10px 0;
+            width: 100%;
+            white-space: normal;
+        }
+        .slides {
+            position:relative;
+            width: 100%;
+            right: 0%;
+            font-size: 0;
+            display:inline-block;
+            white-space: nowrap;
+            transition: right 0.3s ease-in;
+        }
+        .slide {
+            display:inline-block;
+            overflow-x: hidden;
+            overflow-y: auto;
+            vertical-align: top;
+            width:100%;
+            position: relative;
+            text-align: center;
+            font-size: 16px;
+        }
+        .slide-window {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 15px;
+            padding-top: 0;
+            white-space: normal;
+        }
+        .widget-label {
+            display: block;
+            text-align: start;
+            margin: 15px 0;
+            box-sizing: border-box;
+            color: #555;
+        }
+        .widget-label span {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .widget-label span.required::after {
+            content: "*";
+            color: red;
+        }
+        .widget-label textarea,
+        .widget-label input {
+            display: block;
+            font-family: 'Open Sans', sans-serif;
+            color: #333;
+            box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+            box-sizing: border-box;
+            border-radius: 4px;
+            padding: 10px 5px;
+            border: 1px solid #ccc;
+            width: 100%;
+        }
+        .widget-label input[type="date"] {
+            display:block;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            min-height: 40px;
+            min-width: 100%;
+        }
+        .widget-label textarea:focus,
+        .widget-label input:focus {
+            outline: none;
+            box-shadow: 0px 0px 2px 2px ${this.getAttribute('data-color') ?? '#264ec1'};
+            border-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+        }
+        .contact-times-field {
+            margin:0;
+            padding:0;
+        }
+        .contact-times-field legend {
+            display: block;
+            width: 100%;
+            padding: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: inherit;
+            color: #222;
+            border: 0;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .contact-times {
+            padding: 5px 20px;
+        }
+        .date-holder {
+            padding: 5px;
+        }
+        .hider {
+            margin: 10px;
+            margin-bottom: 0px;
+        }
+        .widget-info-list {
+            text-align: left;
+            list-style-type: none;
+            padding: 0;
+        }
+        .widget-info-list li {
+            display: flex;
+            justify-content: space-between;
+            color: #555;
+            margin: 15px 5px;
+        }
+        .widget-info-list li span {
+            text-align: right;
+            color: #333;
+        }
+        .widget-info-list li span:not(:empty):first-child {
+            padding-left: 10px;
+        }
+        .info-box {
+            max-height: 50px;
+            margin: 0;
+            margin-top: 10px;
+            margin-left: 5px;
+            padding: 0;
+            width: 100%;
+            line-height: 1;
+            text-align: center;
+            font-weight: bold;
+            color: #555;
+        }
+        .slide-button {
+            display: flex;
+            padding: 10px;
+            cursor: pointer;
+            color: white;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            border: 0;
+            border-radius: 2px;
+            font-weight: bold;
+            justify-content: space-between;
+            align-items: center;
+            width: 100px;
+        }
+        #widget-submit[disabled],
+        .slide-button[disabled] {
+            cursor: default;
+            opacity: 0.5;
+        }
+        #widget-submit {
+            cursor: pointer;
+            padding: 10px;
+            margin: 15px 0;
+            color: white;
+            border: 0;
+            border-radius: 2px;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-weight: bold;
+        }
+        .verify-loader {
+            display: block;
+            width: 100%;
+        }
+        .verify-loader img {
+            height: 75px;
+            width: auto;
+            margin: 0 auto;
+        }
+        .captcha-text {
+            opacity: 0.7;
+            size: 10px!important;
+        }
+    </style>
+
+    <div id="myModal" class="modal" tabindex="-1" role="dialog" aria-labelledby="contact-widget-title">
+
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="contact-widget-title">Contact Us</h2>
+            <button class="close" aria-label="Close Contact Modal" style="border:none;background:none;">&times;</button>
+          </div>
+          <div class="modal-body">
+            <form aria-labelledby="contact-widget-title" method="post" action="" class="slides">
+                <div class="slide">
+                    <div class="slide-window">
+                        <input type="hidden" name="session_id">
+                        <label class="widget-label">
+                            <span class="required">First Name: </span>
+                            <input type="text" name="fname" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Last Name: </span>
+                            <input type="text" name="lname" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Email: </span>
+                            <input type="email" name="email" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Phone: </span>
+                            <input type="tel" name="phone" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Move In Date: </span>
+                            <input type="date" name="moveindate" required>
+                        </label>
+                        <label class="widget-label">
+                            <span>Message: </span>
+                            <textarea name="notes" rows="3"></textarea>
+                        </label>
+                        <input type="hidden" name="propertycode" value="${this.getAttribute('data-property-code')}">
+                        <div class="info-box" id='widget-info' aria-live="polite"></div>
+                        ${this.getAttribute('data-is-55') == 1 ? '<div class="info-box">By submitting, you confirm you are 55 years of age or older, or submitting on behalf of someone who is 55 years of age or older.</div>' : ''}
+                        <input id="widget-submit" type="submit" value="Submit">
+                        <div class="captcha-text">
+                            This site is protected by reCAPTCHA and the Google
+                            <a href="https://policies.google.com/privacy">Privacy Policy</a> and
+                            <a href="https://policies.google.com/terms">Terms of Service</a> apply.
+                        </div>
+                    </div>
+                </div>
+            </form>
+          </div>
+        </div>
+    </div>
+    `;
+
+    const modal = this.shadowRoot.querySelector('.modal');
+    const input = this.shadowRoot.querySelector('.widget-label input[type="date"]');
+
+    this.shadowRoot.querySelector('form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const submit = this.shadowRoot.querySelector('#widget-submit');
+        const loader = document.createElement('div');
+        const info = this.shadowRoot.querySelector('#widget-info');
+
+        submit.setAttribute('disabled', true);
+        loader.classList.add('verify-loader');
+        loader.innerHTML = '<img src="https://www.marketapts.com/img/03-42-05-37_512.gif" alt="loading">';
+        submit.after(loader);
+
+        //Make sure captcha is loaded and ready
+        if (typeof grecaptcha !== 'undefined') {
+            grecaptcha.ready(() => {
+                grecaptcha.execute('6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw', {action: 'submit'}).then((token) => {
+                    console.log('verifying');
+                    const form = this.shadowRoot.querySelector('form');
+                    const contactInfo = new FormData(form, submit)
+                    contactInfo.append('g-recaptcha-response', token);
+
+                    //Submit form data
+                    fetch('https://api.marketapts.com/v1/contact/insert', {
+                        'method': 'POST',
+                        'body': contactInfo
+                    }).then((response) => {
+                        loader.remove();
+                        if (response.status == 200) {
+                            form.querySelectorAll('label').forEach((label) => {
+                                label.remove();
+                            });
+                            info.innerHTML = 'Thank you for reaching out! We\'ll be contacting you soon<br><br>';
+                            submit.setAttribute('disabled', true);
+                        } else {
+                            info.textContent = 'Something went wrong, please try submitting again';
+                            submit.removeAttribute('disabled');
+                        }
+                    }).catch((error) => {
+                        submit.removeAttribute('disabled');
+                        loader.remove();
+                        console.error(error);
+                        info.textContent = 'Something went wrong, please try submitting again';
+                    });
+                });
+            });
+        } else {
+            info.textContent = 'Something went wrong, please wait a moment and try submitting again';
+            loader.remove();
+            submit.removeAttribute('disabled');
+        }
+    });
+
+    //Add default widget button if doesn't exit
+    if (!document.getElementById(contactPopup.getAttribute('data-button'))) {
+        contactBtn = document.createElement('aside');
+        contactBtn.setAttribute('aria-labelledby', contactPopup.getAttribute('data-button'));
+        contactBtn.innerHTML = `
+          <button id="${contactPopup.getAttribute('data-button')}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-envelope" viewBox="0 0 16 16">
+              <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+            </svg>
+            <span> ${contactPopup.getAttribute('data-btn-text') ?? 'Contact Us'}</span>
+          </button>
+
+          <style>
+            #${contactPopup.getAttribute('data-button')} {
+                font-family: 'Open Sans', sans-serif;
+                display: inline-block;
+                border: 1px solid white!important;
+                border-radius: 2px;
+                background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+                color: white;
+                font-weight: bold;
+                font-size: 24px;
+                padding: 10px;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 9000;
+                ${this.getAttribute('data-css') ?? ''}
+                ${(typeof mktAptsSchWidgetCss === 'undefined') ? '' : mktAptsSchWidgetCss}
+            }
+            @media screen and (max-width: 767px) {
+                #${contactPopup.getAttribute('data-button')} {
+                    ${this.getAttribute('data-sm-css') ?? ''}
+                    ${(typeof mktAptsSchWidgetCssSm === 'undefined') ? '' : mktAptsSchWidgetCssSm}
+                }
+            }
+          </style>
+        `;
+        document.body.appendChild(contactBtn);
+    } else {
+        contactBtn = document.getElementById(contactPopup.getAttribute('data-button'));
+    }
+
+    contactBtn.addEventListener('click', () => {
+        modal.style.display = "block";
+
+        //Render captcha
+        if (!document.querySelector('script[src="https://www.google.com/recaptcha/api.js?render=6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw"]')) {
+            const captchaSrc = document.createElement('script');
+            captchaSrc.setAttribute('src', 'https://www.google.com/recaptcha/api.js?render=6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw');
+            document.body.appendChild(captchaSrc);
+        }
+    });
+
+    contactBtn.addEventListener('click', () => {
+        setTimeout(() => {
+
+            //Add session id from g analytics
+            const s_ids = this.shadowRoot.querySelectorAll('[name="session_id"]');
+            if (s_ids.length) {
+              for (var i = 0; i < s_ids.length; i += 1) {
+                if (typeof getSessionData !== 'undefined') {
+                  getSessionData(function(data) {
+                    s_ids[i].value = data.ga_session_id;
+                  });
+                }
+              }
+            }
+
+            //Move focus to modal
+            this.shadowRoot.querySelector('.modal').focus();
+
+        }, 500)
+    }, {once: true})
+
+    this.shadowRoot.querySelector(".close").onclick = function() {
+      modal.style.display = "none";
+    }
+
+    modal.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+
+  }
+}
+
+class ApplyWidget extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({mode: "open"});
+    this.siteKey = '6Lf2JxIpAAAAAGoik6aQ2QnIYVl8zVOrTGVu4Qjf';
+  }
+
+  connectedCallback() {
+    const applyPopup = this;
+    const captchaStyle = document.createElement('style');
+    let applyBtn;
+
+    captchaStyle.innerHTML = '.grecaptcha-badge { visibility: hidden; }';
+    document.body.appendChild(captchaStyle);
+
+    this.shadowRoot.innerHTML = `
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@500&display=swap');
+
+        .modal {
+          font-family: 'Open Sans', sans-serif;
+          white-space: normal;
+          display: none;
+          position: fixed;
+          z-index: 100000000;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          overflow-x: hidden;
+          overflow-y: auto;
+          background-color: rgb(0,0,0);
+          background-color: rgba(0,0,0,0.4);
+        }
+
+        .close {
+          color: white;
+          background: none;
+          border: none;
+          vertical-align: middle;
+          padding: 10px 18px;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+          color: #aaa;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2px 16px;
+          background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+          color: white;
+          overflow-x: hidden;
+          overflow-y: auto;
+        }
+        .modal-body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* Modal Content */
+        .modal-content {
+          position: relative;
+          overflow-x: hidden;
+          overflow-y: auto;
+          top: 5%;
+          left: 0;
+          right: 0;
+          margin: 5% auto;
+          background-color: #fefefe;
+          padding: 0;
+          border: 1px solid #888;
+          border-radius: 10px;
+          width: 80%;
+          max-width: 700px;
+          box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+          animation-name: animatetop;
+          animation-duration: 0.4s
+        }
+
+        /* Add Animation */
+        @keyframes animatetop {
+          from {top: -300px; opacity: 0}
+          to {top: 0; opacity: 1}
+        }
+        h2 {
+            font-weight: bold;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        h3 {
+            color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-size: 18px;
+            margin: 10px 0;
+            width: 100%;
+            white-space: normal;
+        }
+        .slides {
+            position:relative;
+            width: 100%;
+            right: 0%;
+            font-size: 0;
+            display:inline-block;
+            white-space: nowrap;
+            transition: right 0.3s ease-in;
+        }
+        .slide {
+            display:inline-block;
+            overflow-x: hidden;
+            overflow-y: auto;
+            vertical-align: top;
+            width:100%;
+            position: relative;
+            text-align: center;
+            font-size: 16px;
+        }
+        .slide-window {
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+            padding: 15px;
+            padding-top: 0;
+            white-space: normal;
+        }
+        .widget-label {
+            display: block;
+            text-align: start;
+            margin: 15px 0;
+            box-sizing: border-box;
+            color: #555;
+        }
+        .widget-label span {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .widget-label span.required::after {
+            content: "*";
+            color: red;
+        }
+        .widget-label textarea,
+        .widget-label input {
+            display: block;
+            font-family: 'Open Sans', sans-serif;
+            color: #333;
+            box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+            box-sizing: border-box;
+            border-radius: 4px;
+            padding: 10px 5px;
+            border: 1px solid #ccc;
+            width: 100%;
+        }
+        .widget-label input[type="date"] {
+            display:block;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            min-height: 40px;
+            min-width: 100%;
+        }
+        .widget-label textarea:focus,
+        .widget-label input:focus {
+            outline: none;
+            box-shadow: 0px 0px 2px 2px ${this.getAttribute('data-color') ?? '#264ec1'};
+            border-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+        }
+        .date-holder {
+            padding: 5px;
+        }
+        .hider {
+            margin: 10px;
+            margin-bottom: 0px;
+        }
+        .widget-info-list {
+            text-align: left;
+            list-style-type: none;
+            padding: 0;
+        }
+        .widget-info-list li {
+            display: flex;
+            justify-content: space-between;
+            color: #555;
+            margin: 15px 5px;
+        }
+        .widget-info-list li span {
+            text-align: right;
+            color: #333;
+        }
+        .widget-info-list li span:not(:empty):first-child {
+            padding-left: 10px;
+        }
+        .info-box {
+            max-height: 100px;
+            margin: 0;
+            margin-top: 10px;
+            margin-left: 5px;
+            padding: 0;
+            width: 100%;
+            line-height: 1;
+            text-align: center;
+            font-weight: bold;
+            color: #555;
+        }
+        .slide-button {
+            display: flex;
+            padding: 10px;
+            cursor: pointer;
+            color: white;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            border: 0;
+            border-radius: 2px;
+            font-weight: bold;
+            justify-content: space-between;
+            align-items: center;
+            width: 100px;
+        }
+        #widget-submit[disabled],
+        .slide-button[disabled] {
+            cursor: default;
+            opacity: 0.5;
+        }
+        #widget-submit {
+            cursor: pointer;
+            padding: 10px;
+            margin: 15px 0;
+            color: white;
+            border: 0;
+            border-radius: 2px;
+            background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+            font-weight: bold;
+        }
+        .verify-loader {
+            display: block;
+            width: 100%;
+        }
+        .verify-loader img {
+            height: 75px;
+            width: auto;
+            margin: 0 auto;
+        }
+        .captcha-text {
+            opacity: 0.7;
+            size: 10px!important;
+        }
+    </style>
+
+    <div id="myModal" class="modal" tabindex="-1" role="dialog" aria-labelledby="apply-widget-title">
+
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="apply-widget-title">Apply Now</h2>
+            <button class="close" aria-label="Close Apply Modal" style="border:none;background:none;">&times;</button>
+          </div>
+          <div class="modal-body">
+            <form aria-labelledby="apply-widget-title" method="post" action="" class="slides">
+                <div class="slide">
+                    <div class="slide-window">
+                        <input type="hidden" name="session_id">
+                        <label class="widget-label">
+                            <span class="required">First Name: </span>
+                            <input type="text" name="fname" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Last Name: </span>
+                            <input type="text" name="lname" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Email: </span>
+                            <input type="email" name="email" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Phone: </span>
+                            <input type="tel" name="phone" required>
+                        </label>
+                        <label class="widget-label">
+                            <span class="required">Move In Date: </span>
+                            <input type="date" name="moveindate" required>
+                        </label>
+                        <label class="widget-label">
+                            <span>Message: </span>
+                            <textarea name="notes" rows="3"></textarea>
+                        </label>
+                        <input type="hidden" name="propertycode" value="${this.getAttribute('data-property-code')}">
+                        <div class="info-box" id='widget-info' aria-live="polite"></div>
+                        ${this.getAttribute('data-is-55') == 1 ? '<div class="info-box">By submitting, you confirm you are 55 years of age or older, or submitting on behalf of someone who is 55 years of age or older.</div>' : ''}
+                        <input id="widget-submit" type="submit" value="Submit">
+                        <div class="captcha-text">
+                            This site is protected by reCAPTCHA and the Google
+                            <a href="https://policies.google.com/privacy">Privacy Policy</a> and
+                            <a href="https://policies.google.com/terms">Terms of Service</a> apply.
+                        </div>
+                    </div>
+                </div>
+            </form>
+          </div>
+        </div>
+    </div>
+    `;
+
+    const modal = this.shadowRoot.querySelector('.modal');
+
+    this.shadowRoot.querySelector('form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const submit = this.shadowRoot.querySelector('#widget-submit');
+        const loader = document.createElement('div');
+        const info = this.shadowRoot.querySelector('#widget-info');
+
+        submit.setAttribute('disabled', true);
+        loader.classList.add('verify-loader');
+        loader.innerHTML = '<img src="https://www.marketapts.com/img/03-42-05-37_512.gif" alt="loading">';
+        submit.after(loader);
+
+        //Make sure captcha is loaded and ready
+        if (typeof grecaptcha !== 'undefined') {
+            grecaptcha.ready(() => {
+                grecaptcha.execute('6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw', {action: 'submit'}).then((token) => {
+                    const form = this.shadowRoot.querySelector('form');
+                    const applyInfo = new FormData(form, submit)
+                    applyInfo.append('g-recaptcha-response', token);
+
+                    //Submit form data
+                    fetch('https://api.marketapts.com/v1/apply-online/insert', {
+                        'method': 'POST',
+                        'body': applyInfo
+                    }).then((response) => {
+                        loader.remove();
+                        if (response.status == 200) {
+                            form.querySelectorAll('label').forEach((label) => {
+                                label.remove();
+                            });
+                            info.innerHTML = "Thank you for reaching out!";
+                            submit.setAttribute('disabled', true);
+                            if (this.getAttribute("data-application") && this.getAttribute("data-application") != "" && this.getAttribute("data-application") != "null") {
+                                setTimeout(() => { window.location.assign(this.getAttribute("data-application")) }, 4000);
+                                info.innerHTML = info.innerHTML + ` Redirecting to application...
+                                    <br><br>
+                                    <small style="display:block;"><a href="${this.getAttribute("data-application")}">Click here to go to application</a> if not redirected after 5 seconds</a></small>`;
+                            } else {
+                                info.innerHTML = info.innerHTML + " We'll be contacting you soon<br><br>";
+                            }
+                        } else {
+                            info.innerHTML = 'Something went wrong, please try submitting again';
+                            submit.removeAttribute('disabled');
+                        }
+                    }).catch((error) => {
+                        loader.remove();
+                        info.innerHTML = 'Something went wrong, please try submitting again';
+                        submit.removeAttribute('disabled');
+                        console.error(error);
+                    });
+                });
+            });
+        } else {
+            info.innerHTML = 'Something went wrong, please wait a moment and try submitting again';
+            loader.remove();
+            submit.removeAttribute('disabled');
+        }
+    });
+
+    //Add default widget button if doesn't exit
+    if (!document.getElementById(applyPopup.getAttribute('data-button'))) {
+        applyBtn = document.createElement('aside');
+        applyBtn.setAttribute('aria-labelledby', applyPopup.getAttribute('data-button'));
+        applyBtn.innerHTML = `
+          <button id="${applyPopup.getAttribute('data-button')}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-text" viewBox="0 0 16 16">
+              <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/>
+              <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+            </svg>
+            <span> ${applyPopup.getAttribute('data-btn-text') ?? 'Apply Now'}</span>
+          </button>
+
+          <style>
+            #${applyPopup.getAttribute('data-button')} {
+                font-family: 'Open Sans', sans-serif;
+                display: inline-block;
+                border: 1px solid white!important;
+                border-radius: 2px;
+                background-color: ${this.getAttribute('data-color') ?? '#264ec1'};
+                color: white;
+                font-weight: bold;
+                font-size: 24px;
+                padding: 10px;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 9000;
+                ${this.getAttribute('data-css') ?? ''}
+                ${(typeof mktAptsSchWidgetCss === 'undefined') ? '' : mktAptsSchWidgetCss}
+            }
+            @media screen and (max-width: 767px) {
+                #${applyPopup.getAttribute('data-button')} {
+                    ${this.getAttribute('data-sm-css') ?? ''}
+                    ${(typeof mktAptsSchWidgetCssSm === 'undefined') ? '' : mktAptsSchWidgetCssSm}
+                }
+            }
+          </style>
+        `;
+        document.body.appendChild(applyBtn);
+    } else {
+        applyBtn = document.getElementById(applyPopup.getAttribute('data-button'));
+    }
+
+    applyBtn.addEventListener('click', () => {
+        modal.style.display = "block";
+
+        //Render captcha
+        if (!document.querySelector('script[src="https://www.google.com/recaptcha/api.js?render=6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw"]')) {
+            const captchaSrc = document.createElement('script');
+            captchaSrc.setAttribute('src', 'https://www.google.com/recaptcha/api.js?render=6LdzOxIpAAAAAA4lFMuAzGg41L56VIG10t0ynghw');
+            document.body.appendChild(captchaSrc);
+        }
+    });
+
+    applyBtn.addEventListener('click', () => {
+        setTimeout(() => {
+
+            //Add session id from g analytics
+            const s_ids = this.shadowRoot.querySelectorAll('[name="session_id"]');
+            if (s_ids.length) {
+              for (var i = 0; i < s_ids.length; i += 1) {
+                if (typeof getSessionData !== 'undefined') {
+                  getSessionData(function(data) {
+                    s_ids[i].value = data.ga_session_id;
+                  });
+                }
+              }
+            }
+
+            //Move focus to modal
+            this.shadowRoot.querySelector('.modal').focus();
+
+        }, 500)
+    }, {once: true})
+
+    this.shadowRoot.querySelector(".close").onclick = function() {
+      modal.style.display = "none";
+    }
+
+    modal.onclick = function(event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+
+  }
+
+}
+
+
+class MktAptsWidget extends HTMLElement {
+  constructor() {
+    super();
+  }
+
+  connectedCallback() {
+      this.innerHTML = `
+      <aside aria-label="Widget">
+        <div id="mktapts-widget">
+            <button class="mktapts-widget-list-item mktapts-widget-close" onclick="this.parentElement.classList.remove('open');">
+                &times;
+            </button>
+            ${this.hasAttribute('data-schedule') ? `
+            <button id="schedulerBtn" class="mktapts-widget-list-item sub-widget-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-calendar-fill" viewBox="0 0 16 16">
+                  <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5h16V4H0V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5z"/>
+                </svg>
+                <span> Book a Tour</span>
+            </button>` : ''}
+            ${this.hasAttribute('data-contact') ? `
+            <button id="contactBtn" class="mktapts-widget-list-item sub-widget-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-envelope" viewBox="0 0 16 16">
+                  <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                </svg>
+                <span> Contact Us</span>
+            </button>` : ''}
+            ${this.hasAttribute('data-apply') ? `
+            <button id="applyBtn" class="mktapts-widget-list-item sub-widget-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-text" viewBox="0 0 16 16">
+                  <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5"/>
+                  <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+                </svg>
+                <span> Apply Now</span>
+            </button>` : ''}
+            ${this.hasAttribute('data-photos') ? `
+            <button id="photoBtn" class="mktapts-widget-list-item sub-widget-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-images" viewBox="0 0 16 16">
+                  <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/>
+                  <path d="M14.002 13a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2V5A2 2 0 0 1 2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-1.998 2M14 2H4a1 1 0 0 0-1 1h9.002a2 2 0 0 1 2 2v7A1 1 0 0 0 15 11V3a1 1 0 0 0-1-1M2.002 4a1 1 0 0 0-1 1v8l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71a.5.5 0 0 1 .577-.094l1.777 1.947V5a1 1 0 0 0-1-1z"/>
+                </svg>
+                <span> View Photos</span>
+            </button>` : ''}
+            <button class="mktapts-widget-btn" onclick="this.parentElement.classList.toggle('open');" aria-label="Toggle widget menu">
+              <div class="mktapts-widget-icon-closed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-house-add" viewBox="0 0 16 16">
+                  <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h4a.5.5 0 1 0 0-1h-4a.5.5 0 0 1-.5-.5V7.207l5-5 6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293z"/>
+                  <path d="M16 12.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m-3.5-2a.5.5 0 0 0-.5.5v1h-1a.5.5 0 0 0 0 1h1v1a.5.5 0 1 0 1 0v-1h1a.5.5 0 1 0 0-1h-1v-1a.5.5 0 0 0-.5-.5"/>
+                </svg>
+              </div>
+              <div class="mktapts-widget-icon-open">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="currentColor" class="bi bi-house-down" viewBox="0 0 16 16">
+                  <path d="M7.293 1.5a1 1 0 0 1 1.414 0L11 3.793V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.293l2.354 2.353a.5.5 0 0 1-.708.708L8 2.207l-5 5V13.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 1 0 1h-4A1.5 1.5 0 0 1 2 13.5V8.207l-.646.647a.5.5 0 1 1-.708-.708z"/>
+                  <path d="M12.5 9a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7m.354 5.854 1.5-1.5a.5.5 0 0 0-.708-.707l-.646.646V10.5a.5.5 0 0 0-1 0v2.793l-.646-.646a.5.5 0 0 0-.708.707l1.5 1.5a.5.5 0 0 0 .708 0"/>
+                </svg>
+              </div>
+            </button>
+            ${this.hasAttribute('data-schedule') ? `<scheduler-widget
+                data-property-code="${this.getAttribute('data-property-code')}"
+                data-color="${this.getAttribute('data-color') ?? '#264ec1'}"
+                data-button="schedulerBtn"
+                data-max-days="${this.getAttribute('data-max-days') ?? 60}"
+                data-start-delay="${this.getAttribute('data-start-delay') ?? 0}"
+                data-is-55="${this.getAttribute('data-is-55') ?? 0}"
+            ></scheduler-widget>` : ''}
+            ${this.hasAttribute('data-contact') ? `<contact-widget
+                data-property-code="${this.getAttribute('data-property-code')}"
+                data-color="${this.getAttribute('data-color') ?? '#264ec1'}"
+                data-is-55="${this.getAttribute('data-is-55') ?? 0}"
+                data-button="contactBtn"
+            ></contact-widget>` : ''}
+            ${this.hasAttribute('data-apply') ? `<apply-widget
+                data-property-code="${this.getAttribute('data-property-code')}"
+                data-color="${this.getAttribute('data-color') ?? '#264ec1'}"
+                data-application="${this.getAttribute('data-apply') ?? ""}"
+                data-button="applyBtn"
+                data-is-55="${this.getAttribute('data-is-55') ?? 0}"
+            ></apply-widget>` : ''}
+            ${this.hasAttribute('data-photos') ? `<photo-widget
+                data-property-code="${this.getAttribute('data-property-code')}"
+                data-color="${this.getAttribute('data-color') ?? '#264ec1'}"
+                data-button="photoBtn"
+            ></photo-widget>` : ''}
+        </div>
+
+        <style>
+            #mktapts-widget {
+                font-family: 'Open Sans', sans-serif!important;
+                position: fixed!important;
+                margin: 0!important;
+                padding: 0!important;
+                bottom: 20px!important;
+                right: 20px!important;
+                z-index: 9000!important;
+                display: flex!important;
+                align-items: flex-end!important;
+                flex-direction: column!important;
+                ${this.getAttribute('data-css')}
+            }
+            .mktapts-widget-btn {
+                display: inline-block!important;
+                border: 1px solid white!important;
+                border-radius: 70px!important;
+                background-color: ${this.getAttribute('data-color') ?? '#264ec1'}!important;
+                color: white!important;
+                font-weight: bold!important;
+                font-size: 24px!important;
+                padding: 20px!important;
+                position: relative!important;
+                z-index: 1!important;
+                cursor: pointer!important;
+                margin-top: 10px!important;
+            }
+            .mktapts-widget-list-item {
+                color: ${this.getAttribute('data-color') ?? '#264ec1'}!important;
+                font-size: 16px!important;
+                padding: 0px!important;
+                border: solid 1px ${this.getAttribute('data-color') ?? '#264ec1'}!important;
+                border-radius: 4px!important;
+                background-color: white!important;
+                margin: 0px!important;
+                position: relative!important;
+                z-index: 0!important;
+                text-align: right!important;
+                height: 0px!important;
+                top: 50px!important;
+                opacity: 0!important;
+                width: 100%;
+                pointer-events: none!important;
+                display: block!important;
+                transition: top 0.5s ease-in-out 0.4s, font-size 0.5s ease-in-out 0.3s, padding 0.5s ease-in-out 0.3s, margin 0.5s ease-in-out 0.3s, height 0.5s ease-in-out 0.3s, opacity 0.7s ease-in-out 0.2s!important;
+            }
+            .mktapts-widget-list-item span {
+                font-size: 16px!important;
+                padding: 0!important;
+                margin: 0!important;
+            }
+            @media (prefers-reduced-motion) {
+                .mktapts-widget-list-item {
+                    transition: unset!important;
+                }
+            }
+            .sub-widget-btn {
+                display: flex!important;
+                font-size: 0px!important;
+                justify-content: space-between!important;
+            }
+            .mktapts-widget-close {
+                border-radius: 20px!important;
+                width: 30px!important;
+            }
+            #mktapts-widget .mktapts-widget-icon-closed {
+                display: block!important;
+            }
+            #mktapts-widget .mktapts-widget-icon-open {
+                display: none!important;
+            }
+            #mktapts-widget.open .mktapts-widget-icon-closed {
+                display: none!important;
+            }
+            #mktapts-widget.open .mktapts-widget-icon-open {
+                display: block!important;
+            }
+            #mktapts-widget.open .mktapts-widget-list-item {
+                cursor: pointer!important;
+                pointer-events: auto!important;
+                opacity: 100%!important;
+                top: 0px!important;
+                margin: 5px!important;
+                padding: 10px!important;
+                height: 40px!important;
+                font-size: 16px!important;
+            }
+            #mktapts-widget.open .mktapts-widget-close {
+                padding: 5px 10px!important;
+                height: 30px!important;
+                width: 30px!important;
+            }
+            mktapts-widget svg {
+                vertical-align: middle;
+            }
+            #mktapts-widget.open .mktapts-widget-list-item span {
+                font-size: inherit!important;
+                line-height: inherit!important;
+                padding: 0!important;
+                margin: 0!important;
+            }
+            @media screen and (max-width: 767px) {
+                #mktapts-widget {
+                    ${this.getAttribute('data-sm-css')}
+                }
+            }
+        </style>
+      </aside>
+      `;
+  }
+}
+
+class BaseWidget extends HTMLElement {
+  constructor() {
+    super();
+  }
+
+  connectedCallback() {
+    const propertyCode = this.getAttribute('data-property-code');
+
+    //get config file
+    fetch("https://api.marketapts.com/v1/widget-config/" + propertyCode + ".json", { method: 'GET' })
+    .then(response => response.json())
+    .then((results) => {
+        const options = ["start_delay", "color", "max_schedule_days", "is_55"];
+        const widgetTypes = {
+            "has_schedule_a_tour": {
+                "widget_name": "scheduler-widget",
+                "attr_name": "data-schedule"
+            },
+            "has_photos": {
+                "widget_name": "photo-widget",
+                "attr_name": "data-photos"
+            },
+            "has_contact": {
+                "widget_name": "contact-widget",
+                "attr_name": "data-contact"
+            },
+            "has_apply_now": {
+                "widget_name": "apply-widget",
+                "attr_name": "data-apply"
+            },
+        };
+        const usedModules = [];
+        const widgetAttrs = { 'data-property-code': propertyCode };
+        let widget;
+
+        Object.keys(widgetTypes).forEach((module) => {
+            if (results[module]) {
+                usedModules.push(module);
+            }
+        });
+
+        options.forEach((option) => {
+            if (results[option]) {
+                let attr;
+                if (option === "max_schedule_days") {
+                    attr = "data-max-days";
+                } else {
+                    attr = "data-" + option.replace('_', '-');
+                }
+                widgetAttrs[attr] = results[option];
+            }
+        });
+
+        if (this.getAttribute('data-css')) {
+            widgetAttrs['data-css'] = this.getAttribute('data-css');
+        }
+
+        if (this.getAttribute('data-sm-css')) {
+            widgetAttrs['data-sm-css'] = this.getAttribute('data-sm-css');
+        }
+
+        if (usedModules.length > 1) {
+            //generate widget with multiple modules
+            usedModules.forEach((module) => {
+                if (module === 'has_apply_now') {
+                    widgetAttrs[widgetTypes[module]["attr_name"]] = results["online_application_url"] ?? "";
+                } else {
+                    widgetAttrs[widgetTypes[module]["attr_name"]] = true;
+                }
+            });
+
+            widget = this.setAttributes(document.createElement('mktapts-widget'), widgetAttrs);
+            this.after(widget);
+        } else if (usedModules.length === 1) {
+            //generate individual widget if 1 module
+            if (usedModules[0] === "has_apply_now") {
+                widgetAttrs["data-application"] = results["online_application_url"];
+            }
+
+            widgetAttrs["data-button"] = "mktapts-" + widgetTypes[usedModules[0]]["widget_name"] + "-button"
+            widget = this.setAttributes(document.createElement(widgetTypes[usedModules[0]]["widget_name"]), widgetAttrs);
+            this.after(widget);
+        }
+        
+        this.remove();
+    });
+  }
+
+  setAttributes(el, attrs) {
+    Object.keys(attrs).forEach((key) => {
+      el.setAttribute(key, attrs[key]);
+    });
+    return el;
+  }
+}
+
+
+customElements.define("schedule-widget", BaseWidget);
+customElements.define("mktapts-widget", MktAptsWidget);
+customElements.define("scheduler-widget", ScheduleWidget);
+customElements.define("photo-widget", PhotoWidget);
+customElements.define("contact-widget", ContactWidget);
+customElements.define("apply-widget", ApplyWidget);
