@@ -1,0 +1,138 @@
+market:
+  default_result_limit: 25
+  default_search_depth: 40
+  priority_geographies:
+    - Phoenix, Arizona
+    - Dallas-Fort Worth, Texas
+    - Austin, Texas
+    - Denver, Colorado
+    - Salt Lake City, Utah
+    - Boise, Idaho
+  seed_candidates:
+    Phoenix, Arizona:
+      - name: EPS Group
+        url: https://www.epsgroupinc.com/
+        snippet: Arizona civil engineering firm with land development, planning, survey, and infrastructure services.
+      - name: WoodPatel
+        url: https://www.woodpatel.com/
+        snippet: Phoenix civil engineering firm with land development, drainage, transportation, and water resources services.
+      - name: CVL Consultants
+        url: https://cvlci.com/
+        snippet: Arizona civil engineering, land planning, landscape architecture, and surveying firm.
+      - name: RICK Engineering
+        url: https://rickengineering.com/
+        snippet: Civil engineering and planning firm serving land development, public works, and infrastructure markets.
+      - name: Bowman
+        url: https://bowman.com/
+        snippet: National engineering firm with civil engineering, land development, survey, and construction administration services.
+      - name: Kimley-Horn
+        url: https://www.kimley-horn.com/
+        snippet: National planning and engineering firm with land development, roadway, drainage, and utility design services.
+      - name: Dibble
+        url: https://www.dibblecorp.com/
+        snippet: Phoenix-based civil engineering firm with infrastructure, drainage, transportation, and development services.
+      - name: Entellus
+        url: https://www.entellus.com/
+        snippet: Arizona civil engineering firm focused on water, wastewater, transportation, and public works infrastructure.
+      - name: Atwell
+        url: https://www.atwell-group.com/
+        snippet: Engineering and consulting firm serving land development, real estate, and infrastructure clients.
+      - name: HilgartWilson
+        url: https://www.hilgartwilson.com/
+        snippet: Arizona firm providing civil engineering, land planning, survey, and development services.
+
+agents:
+  research:
+    search_queries:
+      - "{geo} civil engineering firm land development services"
+      - "{geo} site development civil engineering firm"
+      - "{geo} subdivision civil engineer grading drainage utility"
+      - "{geo} land development engineering projects"
+      - "{geo} civil engineering firm master planned community"
+  scraping:
+    preferred_paths:
+      - ""
+      - "services"
+      - "projects"
+      - "portfolio"
+      - "about"
+      - "careers"
+    browser_fallback: false
+  contact_discovery:
+    target_titles:
+      - CAD Manager
+      - Design Manager
+      - Civil Engineering Manager
+      - Project Manager
+      - Site Development Leader
+      - Land Development Leader
+      - Principal
+
+scoring:
+  pass_threshold: 70
+  borderline_threshold: 60
+  weights:
+    land_development_focus: 30
+    civil_3d_likelihood: 15
+    drafting_intensity: 25
+    ai_fit: 20
+    firm_size: 10
+  positive_keywords:
+    land_development:
+      - civil engineering
+      - land development
+      - site development
+      - subdivision
+      - master planned
+      - residential development
+      - commercial development
+      - entitlement
+    civil_3d:
+      - civil engineering
+      - civil 3d
+      - autocad civil 3d
+      - autocad
+      - cad technician
+      - cad designer
+      - drafting
+    drafting:
+      - civil engineering
+      - drainage
+      - utility design
+      - grading plan
+      - drainage plan
+      - stormwater
+      - utility plan
+      - construction documents
+      - plan set
+      - permit plans
+      - erosion control
+      - profiles
+      - redlines
+    ai_fit:
+      - civil engineering
+      - drainage
+      - grading
+      - utilities
+      - utility
+      - stormwater
+      - production
+      - design documents
+      - plan review
+      - construction administration
+    firm_size:
+      - offices
+      - team
+      - careers
+      - hiring
+      - project manager
+      - principal
+  exclusion_keywords:
+    - survey only
+    - land surveying only
+    - geotechnical only
+    - materials testing
+    - environmental consulting only
+    - mep only
+    - electrical engineering only
+    - architecture only

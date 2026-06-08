@@ -1,0 +1,14 @@
+gspread==6.1.2
+google-auth==2.35.0
+requests==2.32.3
+beautifulsoup4==4.12.3
+rapidfuzz==3.10.1
+click==8.1.7
+httpx==0.27.2
+playwright==1.48.0
+pydantic==2.9.2
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+PyYAML==6.0.2
+rich==13.9.2
+supabase==2.10.0

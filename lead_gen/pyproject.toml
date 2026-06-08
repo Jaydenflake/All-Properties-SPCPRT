@@ -1,0 +1,27 @@
+[project]
+name = "spaceport-lead-gen"
+version = "0.1.0"
+description = "Spaceport lead research and scoring pipeline for land development civil engineering firms."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "beautifulsoup4==4.12.3",
+    "click==8.1.7",
+    "httpx==0.27.2",
+    "playwright==1.48.0",
+    "pydantic==2.9.2",
+    "pydantic-settings==2.6.1",
+    "python-dotenv==1.0.1",
+    "PyYAML==6.0.2",
+    "requests==2.32.3",
+    "rich==13.9.2",
+    "supabase==2.10.0",
+]
+
+[project.scripts]
+spaceport-leads = "spaceport_leads.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
