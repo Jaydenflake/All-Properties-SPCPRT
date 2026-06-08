@@ -2,9 +2,3 @@ Supabase.env.txt
 .env
 __pycache__/
 *.pyc
-lead_gen/.venv/
-lead_gen/data/*.db
-lead_gen/data/*.db-*
-lead_gen/src/*.egg-info/
-lead_gen/src/**/__pycache__/
-lead_gen/supabase/.temp/
